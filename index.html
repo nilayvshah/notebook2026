@@ -1865,7 +1865,9 @@ function onDupMK(e){
   lookupDupMember(memberId);
 }
 
-async function lookupDupMember(memberId){
+// lookupDupMember — INSTANT, local cache only, zero API calls
+// Validation happens later when user taps Print
+function lookupDupMember(memberId){
   const mr = document.getElementById('dup-mr');
   const mi = document.getElementById('dup-mi');
   dupMember = null;
@@ -1877,7 +1879,7 @@ async function lookupDupMember(memberId){
   const q = memberId.trim().toUpperCase().replace(/\s+/g,'');
   if(!q) return;
 
-  // Step 1 — instant local cache check
+  // Instant lookup from local mmap cache — no API call
   const member = mmap[q];
   if(!member){
     mi.className = 'scan-input err';
@@ -1887,12 +1889,13 @@ async function lookupDupMember(memberId){
     return;
   }
 
-  // Show checking state
-  mi.className = 'scan-input chk';
+  // Member found — show info instantly
+  dupMember = member;
+  mi.className = 'scan-input ok';
   mi.blur();
   const mf = member.is_marksheet_eligible ? `<span class="mchip m">🏷️ M</span>` : '';
   mr.innerHTML = `
-    <div class="mcard chk">
+    <div class="mcard">
       <span class="mbadge">${esc(member.memberid)}</span>
       <div class="mname">${esc(member.name)}</div>
       <div class="maddr">📍 ${esc(member.address)}</div>
@@ -1900,96 +1903,31 @@ async function lookupDupMember(memberId){
         <span class="mchip">📌 ${esc(member.pincode)}</span>
         <span class="mchip">📱 ${esc(member.mobile)}</span>${mf}
       </div>
-      <div class="chk-row"><span class="sp a"></span> Checking records…</div>
     </div>`;
   mr.classList.add('show');
 
-  // Step 2 — API check: dup slip sheet + transaction_data
-  // Race against 12s timeout so page never appears frozen
-  try{
-    const chkPromise = api({action:'checkDupSlip', member_id: q});
-    const timeoutPromise = new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout')),12000));
-    const chk = await Promise.race([chkPromise, timeoutPromise]);
-
-    if(chk.status === 'dup_slip_exists'){
-      // Already has a dup slip — BLOCK completely
-      mi.className = 'scan-input warn';
-      mr.innerHTML = `
-        <div class="mcard dup">
-          <span class="mbadge dup">${esc(member.memberid)}</span>
-          <div class="mname">${esc(member.name)}</div>
-          <div class="maddr">📍 ${esc(member.address)}</div>
-          <div class="dup-row">
-            🚫 <strong>Duplicate slip already issued</strong><br>
-            Slip #${esc(String(chk.entry_id))} issued by
-            <strong>${esc(chk.userid)}</strong>
-            on ${fmtTs(chk.created_on)}
-            ${chk.remark ? '<br>Remark: '+esc(chk.remark) : ''}
-          </div>
-        </div>`;
-      // Leave btn hidden — do not allow
-      return;
-    }
-
-    if(chk.status === 'entry_exists'){
-      // Found in transaction_data — show warning but still ALLOW
-      mi.className = 'scan-input ok';
-      mr.innerHTML = `
-        <div class="mcard" style="border-color:var(--amber);">
-          <span class="mbadge">${esc(member.memberid)}</span>
-          <div class="mname">${esc(member.name)}</div>
-          <div class="maddr">📍 ${esc(member.address)}</div>
-          <div class="mmeta">
-            <span class="mchip">📌 ${esc(member.pincode)}</span>
-            <span class="mchip">📱 ${esc(member.mobile)}</span>${mf}
-          </div>
-          <div class="dup-row" style="background:rgba(255,179,0,0.12);color:#996600;margin-top:6px;">
-            ⚠️ Entry exists in transaction data<br>
-            Entry #${esc(String(chk.entry_id))} — Qty:${esc(String(chk.qty))} — ₹${esc(String(chk.amount))}
-            — by ${esc(chk.userid)} on ${fmtTs(chk.created_on)}
-          </div>
-        </div>`;
-      // Allow — show remarks, QR, print button
-      dupMember = member;
-      document.getElementById('dup-remarks-card').style.display = 'block';
-      generateDupQR(member.memberid);
-      document.getElementById('btn-dup-print').style.display = 'block';
-      return;
-    }
-
-    // status === 'ok' — all clear
-    mi.className = 'scan-input ok';
-    mr.innerHTML = `
-      <div class="mcard">
-        <span class="mbadge">${esc(member.memberid)}</span>
-        <div class="mname">${esc(member.name)}</div>
-        <div class="maddr">📍 ${esc(member.address)}</div>
-        <div class="mmeta">
-          <span class="mchip">📌 ${esc(member.pincode)}</span>
-          <span class="mchip">📱 ${esc(member.mobile)}</span>${mf}
-        </div>
-      </div>`;
-    dupMember = member;
-    document.getElementById('dup-remarks-card').style.display = 'block';
-    generateDupQR(member.memberid);
-    document.getElementById('btn-dup-print').style.display = 'block';
-
-  }catch(err){
-    // Network error — still allow with warning
-    mi.className = 'scan-input ok';
-    mr.innerHTML = `
-      <div class="mcard">
-        <span class="mbadge">${esc(member.memberid)}</span>
-        <div class="mname">${esc(member.name)}</div>
-        <div class="maddr">📍 ${esc(member.address)}</div>
-        <div class="chk-row" style="color:var(--red);">⚠️ Could not verify records</div>
-      </div>`;
-    dupMember = member;
-    document.getElementById('dup-remarks-card').style.display = 'block';
-    generateDupQR(member.memberid);
-    document.getElementById('btn-dup-print').style.display = 'block';
-  }
+  // Show remarks + QR immediately
+  document.getElementById('dup-remarks-card').style.display = 'block';
+  generateDupQR(member.memberid);
+  // Print button shows with "Validate & Print" label
+  const btn = document.getElementById('btn-dup-print');
+  btn.style.display = 'block';
+  btn.textContent = '🖨️ VALIDATE & PRINT';
 }
+
+
+function onDupMK(e){
+  if(e.key !== 'Enter') return;
+  e.preventDefault();
+  const raw = document.getElementById('dup-mi').value.trim();
+  if(!raw) return;
+  // Decode QR if needed (user might scan instead of type)
+  const memberId = decodeQR(raw);
+  if(memberId !== raw) document.getElementById('dup-mi').value = memberId;
+  lookupDupMember(memberId);
+}
+
+
 
 // ── Encode member ID → QR string ──
 // Reverse of decodeQR:
@@ -2053,10 +1991,44 @@ async function printDupSlip(){
 
   const btn = document.getElementById('btn-dup-print');
   btn.disabled = true;
-  btn.innerHTML = '<span class="sp"></span>Saving…';
+  btn.innerHTML = '<span class="sp"></span>Validating…';
 
-  // Step 1 — save to duplicateslip sheet
   const remark = (document.getElementById('dup-remarks').value||'').trim();
+
+  // Step 1 — validate: check if dup slip already exists (fast API call)
+  try{
+    const chk = await api({action:'checkDupSlip', member_id: dupMember.memberid});
+
+    if(chk.status === 'dup_slip_exists'){
+      // Already issued — block and show info on screen
+      const mr = document.getElementById('dup-mr');
+      const mf = dupMember.is_marksheet_eligible ? `<span class="mchip m">🏷️ M</span>` : '';
+      mr.innerHTML = `
+        <div class="mcard dup">
+          <span class="mbadge dup">${esc(dupMember.memberid)}</span>
+          <div class="mname">${esc(dupMember.name)}</div>
+          <div class="maddr">📍 ${esc(dupMember.address)}</div>
+          <div class="dup-row">
+            🚫 <strong>Duplicate slip already issued</strong><br>
+            Slip #${esc(String(chk.entry_id))} by <strong>${esc(chk.userid)}</strong>
+            on ${fmtTs(chk.created_on)}
+            ${chk.remark ? '<br>Remark: '+esc(chk.remark) : ''}
+          </div>
+        </div>`;
+      mr.classList.add('show');
+      document.getElementById('btn-dup-print').style.display = 'none';
+      showToast('🚫 Dup slip already issued for this member', 'error');
+      btn.disabled = false; btn.innerHTML = '🖨️ VALIDATE & PRINT';
+      return;
+    }
+    // entry_exists or ok — both allow printing
+  }catch(e){
+    // Network error during validation — warn but allow
+    showToast('⚠️ Validation skipped — network error', 'warning');
+  }
+
+  // Step 2 — save record
+  btn.innerHTML = '<span class="sp"></span>Saving…';
   try{
     const saved = await api({
       action:      'addDupSlip',
@@ -2068,12 +2040,12 @@ async function printDupSlip(){
     });
     if(!saved.success){
       showToast('❌ Save failed: '+(saved.error||'Unknown'), 'error');
-      btn.disabled = false; btn.innerHTML = '🖨️ PRINT DUPLICATE SLIP';
+      btn.disabled = false; btn.innerHTML = '🖨️ VALIDATE & PRINT';
       return;
     }
     showToast('✅ Dup Slip #'+saved.entry_id+' saved', 'success');
   }catch(e){
-    showToast('⚠️ Could not save record — printing anyway', 'warning');
+    showToast('⚠️ Could not save — printing anyway', 'warning');
   }
 
   btn.innerHTML = '<span class="sp"></span>Printing…';
