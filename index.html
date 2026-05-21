@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Manav Rahat</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+// Load qrcode-generator as fallback for canvas-based QR
+// This lightweight lib gives us qrcode() function
+</script>
+<script src="https://cdn.rawgit.com/kazuhikoarase/qrcode-generator/master/js/qrcode.js"></script>
 <style>
 /* ── VARIABLES ── */
 :root {
@@ -223,6 +229,92 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
 @keyframes fadeIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
 @keyframes spin{to{transform:rotate(360deg);}}
 
+/* ── DUP SLIP PAGE ── */
+.dup-remarks{
+  width:100%;padding:11px 13px;border:2px solid var(--border);border-radius:9px;
+  font-size:14px;font-family:var(--sans);font-weight:500;color:var(--text);
+  background:#fff;outline:none;resize:none;height:70px;
+  transition:border-color 0.15s;-webkit-appearance:none;
+}
+.dup-remarks:focus{border-color:var(--navy);}
+.qr-canvas-wrap{
+  background:#fff;border-radius:var(--r);padding:14px;
+  box-shadow:var(--sh);display:flex;flex-direction:column;
+  align-items:center;gap:8px;flex-shrink:0;
+}
+.qr-string{font-family:var(--mono);font-size:12px;color:var(--muted);
+  letter-spacing:1px;text-align:center;}
+.btn-dup-print{
+  width:100%;padding:15px;background:var(--purple);border:none;border-radius:12px;
+  font-family:var(--mono);font-size:14px;font-weight:700;color:#fff;
+  letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;
+  box-shadow:0 4px 14px rgba(124,58,237,0.3);flex-shrink:0;
+}
+.btn-dup-print:active{background:#6d28d9;}
+.btn-dup-print:disabled{background:var(--border);color:var(--muted);box-shadow:none;cursor:not-allowed;}
+
+/* ── PRINT DIALOG ── */
+.print-dialog{
+  position:fixed;inset:0;background:rgba(15,31,61,0.75);
+  z-index:8500;display:flex;align-items:center;justify-content:center;
+  padding:20px;animation:fadeIn 0.2s ease;
+}
+.print-dialog.h{display:none;}
+.print-box{
+  background:#fff;border-radius:18px;padding:22px 20px;
+  width:100%;max-width:320px;text-align:center;
+  box-shadow:0 8px 32px rgba(0,0,0,0.25);
+}
+.print-icon{font-size:38px;margin-bottom:10px;}
+.print-title{font-family:var(--mono);font-size:13px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;color:var(--navy);margin-bottom:6px;}
+.print-sub{font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.5;}
+.print-entry-info{
+  background:var(--bg);border-radius:10px;padding:10px 12px;
+  margin-bottom:18px;text-align:left;font-size:12px;color:var(--text);
+  line-height:1.8;
+}
+.print-entry-info strong{color:var(--navy);}
+.print-btns{display:flex;gap:10px;}
+.btn-print-yes{
+  flex:1;padding:13px;background:var(--green);border:none;border-radius:10px;
+  font-family:var(--mono);font-size:13px;font-weight:700;color:#fff;
+  letter-spacing:1px;cursor:pointer;text-transform:uppercase;
+  box-shadow:0 3px 10px rgba(0,201,122,0.3);
+}
+.btn-print-yes:active{background:var(--greenD);}
+.btn-print-no{
+  flex:1;padding:13px;background:var(--bg);border:2px solid var(--border);
+  border-radius:10px;font-family:var(--mono);font-size:13px;font-weight:700;
+  color:var(--muted);letter-spacing:1px;cursor:pointer;text-transform:uppercase;
+}
+.btn-print-no:active{background:var(--border);}
+.print-status{font-size:11px;color:var(--muted);margin-top:10px;min-height:16px;}
+
+/* ── KEYBOARD TOGGLE BUTTON ── */
+.kb-toggle{
+  position:fixed;
+  bottom:14px;
+  left:14px;
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  border:2px solid var(--border);
+  background:var(--card);
+  box-shadow:0 2px 10px rgba(0,0,0,0.15);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+  cursor:pointer;
+  z-index:500;
+  transition:all 0.2s;
+  -webkit-appearance:none;
+}
+.kb-toggle.kb-on  { background:var(--navy); border-color:var(--navy); }
+.kb-toggle.kb-off { background:var(--card); border-color:var(--border); opacity:0.7; }
+.kb-toggle:active { transform:scale(0.88); }
+
 /* ── EDIT MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(15,31,61,0.7);z-index:8000;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn 0.2s ease;}
 .modal-overlay.h{display:none;}
@@ -375,6 +467,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
     </div>
 
   </div>
+
+  <!-- Keyboard toggle — bottom left floating button -->
+  <!-- ⌨️ = keyboard open (navy), ⌨ = keyboard closed (grey) -->
+  <button class="kb-toggle kb-off" id="kb-toggle" onclick="toggleKeyboard()" title="Toggle keyboard">
+    ⌨️
+  </button>
+
 </div>
 
 <!-- ════════════════════════════════
@@ -568,6 +667,7 @@ function goEntry() { showPage('entry');  focusMI(); }
 function goReport1(){ showPage('report1'); loadReport1(); }
 function goReport2(){ if(!isAdmin){showToast('Admin access required','error');return;} showPage('report2'); loadReport2(); }
 function goReport3(){ if(!isAdmin){showToast('Admin access required','error');return;} showPage('report3'); loadReport3(); }
+function goDupSlip()  { showPage('dupslip'); resetDupSlip(); }
 
 // ════════════════════════════════════════════════════
 //  LOGIN
@@ -635,12 +735,67 @@ function initEntry(){
     ? `<button class="tbtn" onclick="goReport1()">📋 My</button>
        <button class="tbtn admin" onclick="goReport2()">👥 All</button>
        <button class="tbtn admin" onclick="goReport3()">📊 Summary</button>
+       <button class="tbtn" style="background:rgba(124,58,237,0.25);color:#c4b5fd;" onclick="goDupSlip()">🔖 Dup</button>
        <button class="tbtn" onclick="doLogout()">Exit</button>`
     : `<button class="tbtn" onclick="goReport1()">📊 Report</button>
+       <button class="tbtn" style="background:rgba(124,58,237,0.25);color:#c4b5fd;" onclick="goDupSlip()">🔖 Dup</button>
        <button class="tbtn" onclick="doLogout()">Exit</button>`;
   resetForm();
 }
-function focusMI(){ setTimeout(()=>{ const e=document.getElementById('mi'); if(e)e.focus(); },120); }
+// Track keyboard state
+let kbOpen = false;
+
+function focusMI(suppressKeyboard=false){
+  setTimeout(()=>{
+    const e=document.getElementById('mi');
+    if(!e) return;
+    if(suppressKeyboard){
+      // readonly trick: focus without opening soft keyboard
+      // Zebra hardware scanner still fires into the focused field
+      e.setAttribute('readonly','readonly');
+      e.focus();
+      setTimeout(()=>{ e.removeAttribute('readonly'); }, 500);
+      setKbState(false);
+    } else {
+      e.removeAttribute('readonly');
+      e.focus();
+      setKbState(true);
+    }
+  }, 150);
+}
+
+// Toggle keyboard on/off for the member ID field
+function toggleKeyboard(){
+  const mi = document.getElementById('mi');
+  if(!mi) return;
+  if(kbOpen){
+    // Close keyboard — set readonly and blur
+    mi.setAttribute('readonly','readonly');
+    mi.blur();
+    setTimeout(()=>{ mi.focus(); }, 100); // refocus for scanner without keyboard
+    setKbState(false);
+  } else {
+    // Open keyboard — remove readonly and focus
+    mi.removeAttribute('readonly');
+    mi.focus();
+    setKbState(true);
+  }
+}
+
+function setKbState(open){
+  kbOpen = open;
+  const btn = document.getElementById('kb-toggle');
+  if(!btn) return;
+  if(open){
+    btn.className = 'kb-toggle kb-on';
+    btn.title     = 'Keyboard ON — tap to close';
+    btn.innerHTML = '⌨️';
+  } else {
+    btn.className = 'kb-toggle kb-off';
+    btn.title     = 'Keyboard OFF — tap to open';
+    btn.innerHTML = '⌨️';
+  }
+}
 
 // ════════════════════════════════════════════════════
 //  SCANNER DETECTION
@@ -736,9 +891,9 @@ async function lookupMember(memberId){
 
   if(!member){
     mi.className='scan-input err';
+    mi.blur(); // dismiss keyboard
     mr.innerHTML=`<div class="mcard nf"><div class="nf-text">✗ Member not found — check ID</div></div>`;
     mr.classList.add('show');
-    // Debug info in console
     console.log('Lookup failed for:', q, '| Cache size:', Object.keys(mmap).length, '| Sample keys:', Object.keys(mmap).slice(0,5));
     return;
   }
@@ -760,6 +915,7 @@ async function lookupMember(memberId){
     const dup=await api({action:'checkDup',member_id:q});
     if(dup.duplicate){
       isDup=true; mi.className='scan-input warn';
+      mi.blur(); // dismiss keyboard
       mr.innerHTML=`
         <div class="mcard dup">
           <span class="mbadge dup">${esc(member.memberid)}</span>
@@ -769,6 +925,7 @@ async function lookupMember(memberId){
         </div>`;
     } else {
       found=member; mi.className='scan-input ok';
+      mi.blur(); // dismiss keyboard so user can see full result
       mr.innerHTML=`
         <div class="mcard">
           <span class="mbadge">${esc(member.memberid)}</span>
@@ -782,6 +939,7 @@ async function lookupMember(memberId){
     }
   }catch(e){
     found=member; mi.className='scan-input ok';
+    mi.blur(); // dismiss keyboard
     mr.innerHTML=`
       <div class="mcard">
         <span class="mbadge">${esc(member.memberid)}</span>
@@ -793,6 +951,9 @@ async function lookupMember(memberId){
     updateAmount();
   }
   updateSubmitBtn();
+  // Scroll entry content to top so member result is fully visible
+  const content = document.querySelector('#page-entry .entry-body');
+  if(content) content.scrollTop = 0;
 }
 
 function updateSubmitBtn(){
@@ -810,7 +971,8 @@ function clearEntry(){
   mi.value=''; mi.className='scan-input';
   document.getElementById('mr').innerHTML='';
   document.getElementById('mr').classList.remove('show');
-  hideMSRow(); updateAmount(); updateSubmitBtn(); focusMI();
+  hideMSRow(); updateAmount(); updateSubmitBtn();
+  focusMI(false); // false = allow keyboard — user tapped Clear to type manually
 }
 
 // ════════════════════════════════════════════════════
@@ -837,8 +999,23 @@ async function doSubmit(){
     if(d.success){
       nxtId=eid+1; sessionStorage.setItem('ni',String(nxtId));
       showLastEntry(eid, savedMember.memberid, savedMember.name, getQty(), d.amount, ms);
-      showToast(`✅ #${eid} saved — ₹${d.amount}${ms==='Yes'?' | 📄':''}`, 'success');
-      resetForm();
+      showToast(`✅ Entry #${eid} saved — ₹${d.amount}${ms==='Yes'?' | 📄':''}`, 'success', 5000);
+      // Only ask for print if entry method is QR code
+      if(method === 'qrcode'){
+        showPrintDialog({
+          entry_id:     eid,
+          member_id:    savedMember.memberid,
+          name:         savedMember.name,
+          qty:          getQty(),
+          amount:       d.amount,
+          marksheet:    ms,
+          entry_method: method,
+          userid:       cUser,
+          username:     cName,
+          timestamp:    d.timestamp,
+        });
+      }
+      resetForm(false);
     } else {
       showToast('❌ '+(d.error||'Error'),'error');
       b.disabled=false; b.textContent='SUBMIT ENTRY';
@@ -864,7 +1041,9 @@ function showLastEntry(eid, memberid, name, qty, amount, marksheet){
 // ════════════════════════════════════════════════════
 //  RESET FORM (after submit — preserves last entry strip)
 // ════════════════════════════════════════════════════
-function resetForm(){
+function resetForm(autoFocus=false){
+  // autoFocus=false after submit (keep keyboard closed so user can read entry ID)
+  // autoFocus=true  after clear button (user is actively working)
   found=null; isDup=false;
   const mi=document.getElementById('mi');
   mi.value=''; mi.className='scan-input';
@@ -872,7 +1051,10 @@ function resetForm(){
   document.getElementById('mr').classList.remove('show');
   hideMSRow(); qIdx=2;
   document.getElementById('qval').textContent='30';
-  method='qrcode'; renderMethod(); updateAmount(); updateSubmitBtn(); focusMI();
+  method='qrcode'; renderMethod(); updateAmount(); updateSubmitBtn();
+  // After submit: suppress keyboard so user can read entry ID toast
+  // After clear: open keyboard so user can type manually
+  focusMI(autoFocus === false);
 }
 
 // ════════════════════════════════════════════════════
@@ -1001,10 +1183,10 @@ function renderEntryList(entries,cId,tId,mId,listId,showUser){
 // ════════════════════════════════════════════════════
 //  HELPERS
 // ════════════════════════════════════════════════════
-function showToast(msg,type=''){
+function showToast(msg,type='',duration=3200){
   const t=document.getElementById('toast');
   t.textContent=msg; t.className='toast '+type+' show';
-  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),3200);
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),duration);
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtTs(ts){
@@ -1154,6 +1336,602 @@ async function saveEdit(){
 }
 
 // ════════════════════════════════════════════════════
+//  BLUETOOTH THERMAL PRINTER — ESC/POS
+//  Works with any Bluetooth printer that supports ESC/POS
+//  (Epson, Generic 58mm/80mm, Zebra ZQ series, etc.)
+// ════════════════════════════════════════════════════
+let btDevice      = null;  // paired BT device
+let btCharacteristic = null; // write characteristic
+let pendingPrintData = null; // entry data waiting to print
+
+// Show print dialog after successful submit
+function showPrintDialog(entryData){
+  pendingPrintData = entryData;
+  const dt = entryData.timestamp
+    ? new Date(entryData.timestamp).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
+    : new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+
+  document.getElementById('print-preview').innerHTML =
+    `<strong>Entry ID :</strong> ${esc(String(entryData.entry_id))}<br>
+     <strong>Member ID:</strong> ${esc(entryData.member_id)}<br>
+     <strong>Name     :</strong> ${esc(entryData.name)}<br>
+     <strong>Quantity :</strong> ${esc(String(entryData.qty))}<br>
+     <strong>Amount   :</strong> ₹${entryData.amount}${entryData.marksheet==='Yes'?' (Marksheet)':''}<br>
+     <strong>By       :</strong> ${esc(entryData.username||entryData.userid)}<br>
+     <strong>Date/Time:</strong> ${dt}`;
+
+  document.getElementById('print-status').textContent = '';
+  document.getElementById('print-dialog').classList.remove('h');
+}
+
+function closePrintDialog(){
+  document.getElementById('print-dialog').classList.add('h');
+  pendingPrintData = null;
+}
+
+// ── Build ESC/POS byte array for 2.5 inch (58mm) paper ──
+function buildEscPos(data){
+  const enc = new TextEncoder();
+
+  // ESC/POS command helpers
+  const ESC  = 0x1B;
+  const GS   = 0x1D;
+  const LF   = 0x0A;
+  const INIT          = [ESC, 0x40];              // Initialize printer
+  const ALIGN_CENTER  = [ESC, 0x61, 0x01];        // Center align
+  const ALIGN_LEFT    = [ESC, 0x61, 0x00];        // Left align
+  const BOLD_ON       = [ESC, 0x45, 0x01];        // Bold on
+  const BOLD_OFF      = [ESC, 0x45, 0x00];        // Bold off
+  const DOUBLE_HEIGHT = [ESC, 0x21, 0x10];        // Double height text
+  const NORMAL_SIZE   = [ESC, 0x21, 0x00];        // Normal text size
+  const CUT           = [GS,  0x56, 0x41, 0x10];  // Partial cut
+
+  function txt(s){ return Array.from(enc.encode(s)); }
+  function line(s=''){ return [...txt(s), LF]; }
+  function separator(){ return line('--------------------------------'); }
+
+  const dt = data.timestamp
+    ? new Date(data.timestamp).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
+    : new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+
+  const bytes = [
+    ...INIT,
+    ...ALIGN_CENTER,
+    ...BOLD_ON,
+    ...DOUBLE_HEIGHT,
+    ...line('MANAV RAHAT'),
+    ...NORMAL_SIZE,
+    ...BOLD_OFF,
+    ...line('Member Entry Receipt'),
+    ...separator(),
+    ...ALIGN_LEFT,
+    ...BOLD_ON,  ...txt('Entry ID  : '), ...BOLD_OFF, ...line(String(data.entry_id)),
+    ...BOLD_ON,  ...txt('Member ID : '), ...BOLD_OFF, ...line(String(data.member_id)),
+    ...BOLD_ON,  ...txt('Name      : '), ...BOLD_OFF, ...line(String(data.name)),
+    ...line(''),
+    ...BOLD_ON,  ...txt('Quantity  : '), ...BOLD_OFF, ...line(String(data.qty)),
+    ...BOLD_ON,  ...txt('Amt Paid  : '), ...BOLD_OFF, ...line('Rs. ' + data.amount),
+  ];
+
+  // Only print marksheet line if marksheet was given
+  if(data.marksheet === 'Yes'){
+    bytes.push(...BOLD_ON, ...line('** Marksheet Submitted **'), ...BOLD_OFF);
+  }
+
+  bytes.push(
+    ...separator(),
+    ...ALIGN_CENTER,
+    ...line('Please issue above qty.'),
+    ...line(''),
+    ...BOLD_ON,
+    ...ALIGN_LEFT,
+    ...txt('Issued By : '), ...BOLD_OFF,
+    ...line(String(data.username || data.userid) + ' (' + String(data.userid) + ')'),
+    ...line(''),
+    ...line(dt),
+    ...separator(),
+    ...line(''), ...line(''), ...line(''),  // feed lines before cut
+    ...CUT,
+  );
+
+  return new Uint8Array(bytes);
+}
+
+// ── Connect to BT printer and print ──
+async function doPrint(){
+  const statusEl = document.getElementById('print-status');
+  const btn      = document.querySelector('.btn-print-yes');
+  if(!pendingPrintData){ closePrintDialog(); return; }
+
+  // Check Web Bluetooth support
+  if(!navigator.bluetooth){
+    statusEl.textContent = '⚠️ Bluetooth not supported on this browser. Use Chrome.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="sp"></span>Connecting…';
+  statusEl.textContent = 'Searching for printer…';
+
+  try{
+    // If already paired, reuse connection
+    if(!btCharacteristic){
+      statusEl.textContent = 'Select your printer…';
+      btDevice = await navigator.bluetooth.requestDevice({
+        // Accept any BT device — user picks their printer from system dialog
+        acceptAllDevices: true,
+        optionalServices: [
+          '000018f0-0000-1000-8000-00805f9b34fb',  // Generic BT printer service
+          '00001101-0000-1000-8000-00805f9b34fb',  // SPP (Serial Port Profile)
+          'e7810a71-73ae-499d-8c15-faa9aef0c3f2',  // Common ESC/POS BLE service
+          '49535343-fe7d-4ae5-8fa9-9fafd205e455',  // Another common ESC/POS
+        ],
+      });
+
+      statusEl.textContent = 'Connecting to ' + btDevice.name + '…';
+      const server  = await btDevice.gatt.connect();
+
+      // Try known ESC/POS BLE service UUIDs
+      let service = null;
+      const serviceUUIDs = [
+        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+        '000018f0-0000-1000-8000-00805f9b34fb',
+      ];
+      for(const uuid of serviceUUIDs){
+        try{ service = await server.getPrimaryService(uuid); break; }
+        catch(e){ /* try next */ }
+      }
+      if(!service){
+        // Fallback: get first available service
+        const services = await server.getPrimaryServices();
+        if(services.length > 0) service = services[0];
+      }
+      if(!service) throw new Error('No compatible service found on printer');
+
+      // Get writable characteristic
+      const chars = await service.getCharacteristics();
+      btCharacteristic = null;
+      for(const c of chars){
+        if(c.properties.write || c.properties.writeWithoutResponse){
+          btCharacteristic = c; break;
+        }
+      }
+      if(!btCharacteristic) throw new Error('No writable characteristic found');
+    }
+
+    // Build and send ESC/POS data
+    statusEl.textContent = 'Printing…';
+    const printData = buildEscPos(pendingPrintData);
+
+    // Send in 512-byte chunks (BLE MTU limit)
+    const CHUNK = 512;
+    for(let i=0; i<printData.length; i+=CHUNK){
+      const chunk = printData.slice(i, i+CHUNK);
+      if(btCharacteristic.properties.writeWithoutResponse){
+        await btCharacteristic.writeValueWithoutResponse(chunk);
+      } else {
+        await btCharacteristic.writeValue(chunk);
+      }
+      // Small delay between chunks
+      await new Promise(r=>setTimeout(r,50));
+    }
+
+    statusEl.textContent = '✅ Printed successfully!';
+    setTimeout(()=>closePrintDialog(), 1500);
+
+  }catch(err){
+    console.error('Print error:', err);
+    btCharacteristic = null; // reset on error
+    if(err.name === 'NotFoundError'){
+      statusEl.textContent = 'No printer selected.';
+    } else {
+      statusEl.textContent = '❌ ' + err.message;
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '🖨️ Yes';
+}
+
+// ════════════════════════════════════════════════════
+//  DUP SLIP
+// ════════════════════════════════════════════════════
+let dupMember = null;  // current member for dup slip
+
+function goDupSlip(){
+  showPage('dupslip');
+  resetDupSlip();
+}
+
+function resetDupSlip(){
+  dupMember = null;
+  const mi = document.getElementById('dup-mi');
+  mi.value = ''; mi.className = 'scan-input';
+  document.getElementById('dup-mr').innerHTML = '';
+  document.getElementById('dup-mr').classList.remove('show');
+  document.getElementById('dup-remarks-card').style.display = 'none';
+  document.getElementById('dup-qr-wrap').style.display = 'none';
+  document.getElementById('btn-dup-print').style.display = 'none';
+  document.getElementById('dup-remarks').value = '';
+  // Clear QR canvas
+  const canvas = document.getElementById('dup-qr-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  setTimeout(()=>{ const e=document.getElementById('dup-mi'); if(e) e.focus(); },150);
+}
+
+function onDupMK(e){
+  if(e.key !== 'Enter') return;
+  e.preventDefault();
+  const raw = document.getElementById('dup-mi').value.trim();
+  if(!raw) return;
+  // Decode QR if needed (user might scan instead of type)
+  const memberId = decodeQR(raw);
+  if(memberId !== raw) document.getElementById('dup-mi').value = memberId;
+  lookupDupMember(memberId);
+}
+
+async function lookupDupMember(memberId){
+  const mr = document.getElementById('dup-mr');
+  const mi = document.getElementById('dup-mi');
+  dupMember = null;
+  mi.className = 'scan-input';
+  document.getElementById('dup-remarks-card').style.display = 'none';
+  document.getElementById('dup-qr-wrap').style.display = 'none';
+  document.getElementById('btn-dup-print').style.display = 'none';
+
+  const q = memberId.trim().toUpperCase().replace(/\s+/g,'');
+  if(!q) return;
+
+  // Step 1 — instant local cache check
+  const member = mmap[q];
+  if(!member){
+    mi.className = 'scan-input err';
+    mi.blur();
+    mr.innerHTML = `<div class="mcard nf"><div class="nf-text">✗ Member not found — check ID</div></div>`;
+    mr.classList.add('show');
+    return;
+  }
+
+  // Show checking state
+  mi.className = 'scan-input chk';
+  mi.blur();
+  const mf = member.is_marksheet_eligible ? `<span class="mchip m">🏷️ M</span>` : '';
+  mr.innerHTML = `
+    <div class="mcard chk">
+      <span class="mbadge">${esc(member.memberid)}</span>
+      <div class="mname">${esc(member.name)}</div>
+      <div class="maddr">📍 ${esc(member.address)}</div>
+      <div class="mmeta">
+        <span class="mchip">📌 ${esc(member.pincode)}</span>
+        <span class="mchip">📱 ${esc(member.mobile)}</span>${mf}
+      </div>
+      <div class="chk-row"><span class="sp a"></span> Checking records…</div>
+    </div>`;
+  mr.classList.add('show');
+
+  // Step 2 — API check: dup slip sheet + transaction_data
+  try{
+    const chk = await api({action:'checkDupSlip', member_id: q});
+
+    if(chk.status === 'dup_slip_exists'){
+      // Already has a dup slip — BLOCK completely
+      mi.className = 'scan-input warn';
+      mr.innerHTML = `
+        <div class="mcard dup">
+          <span class="mbadge dup">${esc(member.memberid)}</span>
+          <div class="mname">${esc(member.name)}</div>
+          <div class="maddr">📍 ${esc(member.address)}</div>
+          <div class="dup-row">
+            🚫 <strong>Duplicate slip already issued</strong><br>
+            Slip #${esc(String(chk.entry_id))} issued by
+            <strong>${esc(chk.userid)}</strong>
+            on ${fmtTs(chk.created_on)}
+            ${chk.remark ? '<br>Remark: '+esc(chk.remark) : ''}
+          </div>
+        </div>`;
+      // Leave btn hidden — do not allow
+      return;
+    }
+
+    if(chk.status === 'entry_exists'){
+      // Found in transaction_data — show warning but still ALLOW
+      mi.className = 'scan-input ok';
+      mr.innerHTML = `
+        <div class="mcard" style="border-color:var(--amber);">
+          <span class="mbadge">${esc(member.memberid)}</span>
+          <div class="mname">${esc(member.name)}</div>
+          <div class="maddr">📍 ${esc(member.address)}</div>
+          <div class="mmeta">
+            <span class="mchip">📌 ${esc(member.pincode)}</span>
+            <span class="mchip">📱 ${esc(member.mobile)}</span>${mf}
+          </div>
+          <div class="dup-row" style="background:rgba(255,179,0,0.12);color:#996600;margin-top:6px;">
+            ⚠️ Entry exists in transaction data<br>
+            Entry #${esc(String(chk.entry_id))} — Qty:${esc(String(chk.qty))} — ₹${esc(String(chk.amount))}
+            — by ${esc(chk.userid)} on ${fmtTs(chk.created_on)}
+          </div>
+        </div>`;
+      // Allow — show remarks, QR, print button
+      dupMember = member;
+      document.getElementById('dup-remarks-card').style.display = 'block';
+      generateDupQR(member.memberid);
+      document.getElementById('btn-dup-print').style.display = 'block';
+      return;
+    }
+
+    // status === 'ok' — all clear
+    mi.className = 'scan-input ok';
+    mr.innerHTML = `
+      <div class="mcard">
+        <span class="mbadge">${esc(member.memberid)}</span>
+        <div class="mname">${esc(member.name)}</div>
+        <div class="maddr">📍 ${esc(member.address)}</div>
+        <div class="mmeta">
+          <span class="mchip">📌 ${esc(member.pincode)}</span>
+          <span class="mchip">📱 ${esc(member.mobile)}</span>${mf}
+        </div>
+      </div>`;
+    dupMember = member;
+    document.getElementById('dup-remarks-card').style.display = 'block';
+    generateDupQR(member.memberid);
+    document.getElementById('btn-dup-print').style.display = 'block';
+
+  }catch(err){
+    // Network error — still allow with warning
+    mi.className = 'scan-input ok';
+    mr.innerHTML = `
+      <div class="mcard">
+        <span class="mbadge">${esc(member.memberid)}</span>
+        <div class="mname">${esc(member.name)}</div>
+        <div class="maddr">📍 ${esc(member.address)}</div>
+        <div class="chk-row" style="color:var(--red);">⚠️ Could not verify records</div>
+      </div>`;
+    dupMember = member;
+    document.getElementById('dup-remarks-card').style.display = 'block';
+    generateDupQR(member.memberid);
+    document.getElementById('btn-dup-print').style.display = 'block';
+  }
+}
+
+// ── Encode member ID → QR string ──
+// Reverse of decodeQR:
+// Input: A1  → Output: 2026105A   (2026 + numeric + month(2digit) + alpha)
+// Input: R131 → Output: 202613105R
+// Input: BH25 → Output: 20262505BH
+function encodeQR(memberId){
+  const s = memberId.trim().toUpperCase();
+  // Split into alpha prefix and numeric part
+  const match = s.match(/^([A-Z]{1,2})(\d+)$/);
+  if(!match) return s; // can't encode — return as-is
+
+  const alpha   = match[1];               // e.g. "A", "R", "BH"
+  const numeric = match[2];               // e.g. "1", "131", "25"
+  const year    = new Date().getFullYear(); // e.g. 2026
+  const month   = String(new Date().getMonth()+1).padStart(2,'0'); // e.g. "05"
+
+  return String(year) + numeric + month + alpha;
+  // A1   → 2026 + 1  + 05 + A  = 2026105A
+  // R131 → 2026 + 131+ 05 + R  = 202613105R
+  // BH25 → 2026 + 25 + 05 + BH = 20262505BH
+}
+
+// ── Generate QR code on canvas using pure JS ──
+// Uses qrcode-generator library loaded from CDN
+function generateDupQR(memberId){
+  const qrString = encodeQR(memberId);
+  document.getElementById('dup-qr-string').textContent = qrString;
+  document.getElementById('dup-qr-wrap').style.display = 'flex';
+
+  // Draw QR using the loaded library
+  try{
+    const qr = qrcode(0, 'M');
+    qr.addData(qrString);
+    qr.make();
+    const canvas  = document.getElementById('dup-qr-canvas');
+    const ctx     = canvas.getContext('2d');
+    const modules = qr.getModuleCount();
+    const size    = 160;
+    const cell    = size / modules;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0,0,size,size);
+    ctx.fillStyle = '#000';
+    for(let r=0; r<modules; r++){
+      for(let c=0; c<modules; c++){
+        if(qr.isDark(r,c)){
+          ctx.fillRect(c*cell, r*cell, cell, cell);
+        }
+      }
+    }
+    console.log('QR generated:', qrString);
+  }catch(err){
+    console.error('QR generation error:', err);
+    document.getElementById('dup-qr-string').textContent = qrString + ' (QR lib not loaded)';
+  }
+}
+
+// ── Print Dup Slip via Bluetooth — saves to sheet first ──
+async function printDupSlip(){
+  if(!dupMember){ return; }
+
+  const btn = document.getElementById('btn-dup-print');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="sp"></span>Saving…';
+
+  // Step 1 — save to duplicateslip sheet
+  const remark = (document.getElementById('dup-remarks').value||'').trim();
+  try{
+    const saved = await api({
+      action:      'addDupSlip',
+      member_id:   dupMember.memberid,
+      member_name: dupMember.name,
+      manav_rahat: dupMember.manav_rahat || '',
+      remark:      remark,
+      userid:      cUser,
+    });
+    if(!saved.success){
+      showToast('❌ Save failed: '+(saved.error||'Unknown'), 'error');
+      btn.disabled = false; btn.innerHTML = '🖨️ PRINT DUPLICATE SLIP';
+      return;
+    }
+    showToast('✅ Dup Slip #'+saved.entry_id+' saved', 'success');
+  }catch(e){
+    showToast('⚠️ Could not save record — printing anyway', 'warning');
+  }
+
+  btn.innerHTML = '<span class="sp"></span>Printing…';
+
+  if(!navigator.bluetooth){
+    showToast('⚠️ Bluetooth not supported. Use Chrome.','error');
+    btn.disabled = false; btn.innerHTML = '🖨️ PRINT DUPLICATE SLIP';
+    return;
+  }
+
+  try{
+    // Reuse existing BT connection or connect fresh
+    if(!btCharacteristic){
+      btDevice = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices:[
+          'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+          '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+          '000018f0-0000-1000-8000-00805f9b34fb',
+        ],
+      });
+      const server = await btDevice.gatt.connect();
+      const serviceUUIDs = [
+        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+        '000018f0-0000-1000-8000-00805f9b34fb',
+      ];
+      let service = null;
+      for(const uuid of serviceUUIDs){
+        try{ service = await server.getPrimaryService(uuid); break; }catch(e){}
+      }
+      if(!service){
+        const services = await server.getPrimaryServices();
+        if(services.length>0) service = services[0];
+      }
+      if(!service) throw new Error('No compatible printer service found');
+      const chars = await service.getCharacteristics();
+      btCharacteristic = null;
+      for(const c of chars){
+        if(c.properties.write || c.properties.writeWithoutResponse){
+          btCharacteristic = c; break;
+        }
+      }
+      if(!btCharacteristic) throw new Error('No writable characteristic');
+    }
+
+    const printData = buildDupSlipEscPos();
+    const CHUNK = 512;
+    for(let i=0; i<printData.length; i+=CHUNK){
+      const chunk = printData.slice(i,i+CHUNK);
+      if(btCharacteristic.properties.writeWithoutResponse){
+        await btCharacteristic.writeValueWithoutResponse(chunk);
+      } else {
+        await btCharacteristic.writeValue(chunk);
+      }
+      await new Promise(r=>setTimeout(r,50));
+    }
+    showToast('✅ Dup Slip printed!','success');
+  }catch(err){
+    console.error('Dup print error:',err);
+    btCharacteristic = null;
+    if(err.name==='NotFoundError') showToast('No printer selected','warning');
+    else showToast('❌ '+err.message,'error');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '🖨️ PRINT DUPLICATE SLIP';
+}
+
+// ── Build ESC/POS for Dup Slip ──
+function buildDupSlipEscPos(){
+  const enc  = new TextEncoder();
+  const ESC  = 0x1B, GS = 0x1D, LF = 0x0A;
+  const INIT         = [ESC,0x40];
+  const ALIGN_CENTER = [ESC,0x61,0x01];
+  const ALIGN_LEFT   = [ESC,0x61,0x00];
+  const BOLD_ON      = [ESC,0x45,0x01];
+  const BOLD_OFF     = [ESC,0x45,0x00];
+  const BIG          = [ESC,0x21,0x30]; // double width + double height
+  const NORMAL       = [ESC,0x21,0x00];
+  const CUT          = [GS, 0x56,0x41,0x10];
+
+  function txt(s){ return Array.from(enc.encode(s)); }
+  function line(s=''){ return [...txt(s),LF]; }
+  function sep(){ return line('--------------------------------'); }
+
+  const remarks  = (document.getElementById('dup-remarks').value||'').trim();
+  const qrString = encodeQR(dupMember.memberid);
+  const dt       = new Date().toLocaleString('en-IN',{
+    day:'2-digit',month:'short',year:'numeric',
+    hour:'2-digit',minute:'2-digit',hour12:true
+  });
+
+  const bytes = [
+    ...INIT,
+    ...ALIGN_CENTER,
+    ...BOLD_ON,
+    ...BIG,
+    ...line('DUPLICATE SLIP'),
+    ...NORMAL,
+    ...BOLD_OFF,
+    ...sep(),
+    ...ALIGN_LEFT,
+    ...BOLD_ON,  ...txt('Member ID  : '), ...BOLD_OFF, ...line(dupMember.memberid),
+    ...BOLD_ON,  ...txt('Name       : '), ...BOLD_OFF, ...line(dupMember.name),
+    ...BOLD_ON,  ...txt('Address    : '), ...BOLD_OFF,
+    // Word-wrap address to fit 32 chars per line
+    ...wrapText(dupMember.address, 32),
+    ...line(''),
+    ...BOLD_ON,  ...txt('QR Code    : '), ...BOLD_OFF, ...line(qrString),
+  ];
+
+  if(remarks){
+    bytes.push(
+      ...BOLD_ON, ...txt('Remarks    : '), ...BOLD_OFF,
+      ...wrapText(remarks, 32),
+    );
+  }
+
+  bytes.push(
+    ...sep(),
+    ...ALIGN_LEFT,
+    ...BOLD_ON, ...txt('Issued By  : '), ...BOLD_OFF,
+    ...line((cName||cUser)+' ('+cUser+')'),
+    ...line(dt),
+    ...sep(),
+    ...line(''), ...line(''), ...line(''),
+    ...CUT,
+  );
+
+  return new Uint8Array(bytes);
+}
+
+// ── Word wrap helper for narrow thermal paper ──
+function wrapText(text, maxLen){
+  const LF = 0x0A;
+  const enc = new TextEncoder();
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for(const w of words){
+    if((cur+' '+w).trim().length > maxLen){
+      if(cur) lines.push(cur.trim());
+      cur = w;
+    } else {
+      cur = (cur+' '+w).trim();
+    }
+  }
+  if(cur) lines.push(cur.trim());
+  const bytes = [];
+  for(const l of lines){ bytes.push(...Array.from(enc.encode(l)), LF); }
+  return bytes;
+}
+
+// ════════════════════════════════════════════════════
 //  START — called after all functions are defined above
 // ════════════════════════════════════════════════════
 (function init(){
@@ -1233,6 +2011,69 @@ async function saveEdit(){
   </div>
 </div>
 
+
+<!-- ════════════════════════════════
+     PAGE: DUP SLIP
+════════════════════════════════ -->
+<div class="page" id="page-dupslip">
+  <div class="topbar">
+    <button class="btn-back" onclick="goEntry()">← Back</button>
+    <div class="topbar-title" style="color:#c4b5fd;">🔖 Duplicate Slip</div>
+    <button class="btn-refresh" onclick="resetDupSlip()">↺</button>
+  </div>
+  <div class="entry-body">
+
+    <!-- Member ID input -->
+    <div class="c">
+      <label class="clabel">Member ID — Type or Scan → Enter</label>
+      <div class="scan-row">
+        <input class="scan-input" type="text" id="dup-mi"
+          placeholder="Enter member ID e.g. A1, N106"
+          autocomplete="off" autocorrect="off" autocapitalize="none"
+          spellcheck="false" inputmode="text"
+          onkeydown="onDupMK(event)">
+        <button class="btn-clear" onclick="resetDupSlip()">✕</button>
+      </div>
+      <div class="mresult" id="dup-mr"></div>
+    </div>
+
+    <!-- Remarks -->
+    <div class="c" id="dup-remarks-card" style="display:none;">
+      <label class="clabel">Remarks (optional)</label>
+      <textarea class="dup-remarks" id="dup-remarks" placeholder="Enter any remarks…"></textarea>
+    </div>
+
+    <!-- QR Code preview -->
+    <div class="qr-canvas-wrap" id="dup-qr-wrap" style="display:none;">
+      <label class="clabel" style="align-self:flex-start;">QR Code</label>
+      <canvas id="dup-qr-canvas" width="160" height="160"></canvas>
+      <div class="qr-string" id="dup-qr-string"></div>
+    </div>
+
+    <!-- Print button -->
+    <button class="btn-dup-print" id="btn-dup-print" style="display:none;" onclick="printDupSlip()">
+      🖨️ PRINT DUPLICATE SLIP
+    </button>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     PRINT DIALOG
+════════════════════════════════ -->
+<div class="print-dialog h" id="print-dialog">
+  <div class="print-box">
+    <div class="print-icon">🖨️</div>
+    <div class="print-title">Print Receipt?</div>
+    <div class="print-sub">Print this entry on the<br>Bluetooth thermal printer?</div>
+    <div class="print-entry-info" id="print-preview"></div>
+    <div class="print-btns">
+      <button class="btn-print-no"  onclick="closePrintDialog()">✕ No</button>
+      <button class="btn-print-yes" onclick="doPrint()">🖨️ Yes</button>
+    </div>
+    <div class="print-status" id="print-status"></div>
+  </div>
+</div>
 
 </body>
 </html>
