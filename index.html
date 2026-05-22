@@ -2233,7 +2233,11 @@ function onCodeDetected(raw){
       entryMethod  = 'qrcode';
       updateMethodBadge();
       showToast('📷 Scanned: ' + memberId, 'success');
-      setTimeout(()=> lookupMember(memberId), 150);
+      // Simulate Enter key on the input — triggers exact same flow as manual scan
+      setTimeout(()=>{
+        mi.focus();
+        mi.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+      }, 150);
 
     } else if(target === 'dup'){
       dupTabMode = 'id';
@@ -2248,7 +2252,11 @@ function onCodeDetected(raw){
       dupMethod    = 'qrcode';
       dupRenderMethod();
       showToast('📷 Scanned: ' + memberId, 'success');
-      setTimeout(()=> dupLookupMember(memberId), 150);
+      // Simulate Enter key on dup input
+      setTimeout(()=>{
+        dmi.focus();
+        dmi.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+      }, 150);
 
     } else {
       // target was null or unexpected — show error on screen
