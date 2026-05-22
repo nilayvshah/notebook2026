@@ -1975,7 +1975,7 @@ function dupLookupMember(memberId){
             <span class="mbadge dup">${esc(member.memberid)}</span>
             <div class="mname">${esc(member.name)}</div>
             <div class="maddr">📍 ${esc(member.address)}</div>
-            <div class="dup-row">⚠️ Already entered today by <strong>${esc(dup.by)}</strong> at <strong>${esc(dup.at)}</strong></div>
+            <div class="dup-row">⚠️ Already entered by <strong>${esc(dup.by)}</strong> at <strong>${esc(dup.at)}</strong></div>
           </div>`;
         document.getElementById('dup-msr').classList.remove('show');
       } else {
