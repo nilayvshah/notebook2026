@@ -227,6 +227,65 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
 @keyframes fadeIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
 @keyframes spin{to{transform:rotate(360deg);}}
 
+/* ── CAMERA SCANNER ── */
+.cam-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.92);
+  z-index:8000;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;
+}
+.cam-overlay.h{display:none;}
+.cam-header{
+  color:#fff;font-family:var(--mono);font-size:12px;
+  letter-spacing:1px;text-transform:uppercase;text-align:center;
+}
+.cam-video-wrap{
+  position:relative;width:280px;height:280px;
+  border-radius:16px;overflow:hidden;
+  border:3px solid var(--green);
+  box-shadow:0 0 0 4px rgba(0,201,122,0.2);
+}
+.cam-video{width:100%;height:100%;object-fit:cover;}
+.cam-canvas{display:none;}
+/* Scanning crosshair overlay */
+.cam-crosshair{
+  position:absolute;inset:0;pointer-events:none;
+}
+.cam-crosshair::before,.cam-crosshair::after{
+  content:'';position:absolute;
+  width:40px;height:40px;
+  border-color:var(--green);border-style:solid;
+}
+.cam-crosshair::before{top:12px;left:12px;border-width:3px 0 0 3px;}
+.cam-crosshair::after {bottom:12px;right:12px;border-width:0 3px 3px 0;}
+/* Scanning line animation */
+.cam-scanline{
+  position:absolute;left:10%;right:10%;height:2px;
+  background:linear-gradient(90deg,transparent,var(--green),transparent);
+  animation:scanline 2s ease-in-out infinite;
+  box-shadow:0 0 8px var(--green);
+}
+@keyframes scanline{0%{top:15%;}50%{top:80%;}100%{top:15%;}}
+.cam-status{
+  font-size:12px;color:rgba(255,255,255,0.7);
+  text-align:center;min-height:20px;
+}
+.cam-status.found{color:var(--green);font-weight:700;}
+.cam-status.err  {color:var(--red);}
+.btn-cam-close{
+  padding:10px 28px;border:2px solid rgba(255,255,255,0.3);
+  border-radius:30px;background:transparent;color:#fff;
+  font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer;
+}
+.btn-cam-close:active{background:rgba(255,255,255,0.1);}
+.btn-cam{
+  flex-shrink:0;width:44px;height:44px;
+  border:2px solid var(--border);border-radius:9px;
+  background:#fff;font-size:20px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;-webkit-appearance:none;
+}
+.btn-cam:active{background:var(--navy);border-color:var(--navy);}
+
 /* ── DUP SLIP PAGE ── */
 .dup-search-tabs{display:flex;gap:6px;margin-bottom:8px;}
 .dup-tab{flex:1;padding:8px;border:2px solid var(--border);border-radius:9px;
@@ -409,7 +468,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
           autocomplete="off" autocorrect="off" autocapitalize="none"
           spellcheck="false" inputmode="text"
           onkeydown="onMK(event)" oninput="onMI()">
-        <button class="btn-clear" onclick="clearEntry()">✕</button>
+        <button class="btn-cam"   onclick="openCamera('entry')" title="Scan with camera">📷</button>
+        <button class="btn-clear" onclick="clearEntry()" title="Clear">✕</button>
       </div>
       <div class="mresult" id="mr"></div>
     </div>
@@ -2027,6 +2087,8 @@ async function dupSubmit(){
       document.getElementById('dup-le-amt').textContent  = ms==='Yes'?'₹0 📄':'₹'+d.amount;
       document.getElementById('dup-last-entry').classList.add('show');
       showToast(`✅ Dup Slip #${eid} saved — ₹${d.amount}`, 'success', 5000);
+      // Re-enable button immediately so it's ready for next entry
+      btn.disabled=false; btn.innerHTML='🔖 SUBMIT DUPLICATE SLIP';
       // Reset form fields but keep last entry strip
       dupFound=null;
       const mi=document.getElementById('dup-mi');
@@ -2038,7 +2100,8 @@ async function dupSubmit(){
       document.getElementById('dup-mscb').checked=false;
       dupQIdx=2; document.getElementById('dup-qval').textContent='30';
       dupMethod='qrcode'; dupRenderMethod(); dupUpdateAmount();
-      focusMI(true); // keep scanner ready
+      // Focus dup slip input (not main entry input)
+      setTimeout(()=>{ const e=document.getElementById('dup-mi'); if(e){ e.setAttribute('readonly','readonly'); e.focus(); setTimeout(()=>e.removeAttribute('readonly'),500); }},150);
     } else {
       showToast('❌ '+(d.error||'Error'),'error');
       btn.disabled=false; btn.innerHTML='🔖 SUBMIT DUPLICATE SLIP';
@@ -2047,6 +2110,137 @@ async function dupSubmit(){
     showToast('⚠️ Network error. Try again.','error');
     btn.disabled=false; btn.innerHTML='🔖 SUBMIT DUPLICATE SLIP';
   }
+}
+
+// ════════════════════════════════════════════════════
+//  CAMERA QR SCANNER
+//  Uses BarcodeDetector API (Android Chrome built-in) if available
+//  Falls back to jsQR library for video frame decoding
+// ════════════════════════════════════════════════════
+let camStream    = null;   // active MediaStream
+let camTarget    = null;   // 'entry' | 'dup'
+let camAnimFrame = null;   // requestAnimationFrame handle
+let camActive    = false;
+
+async function openCamera(target){
+  camTarget = target;
+  document.getElementById('cam-overlay').classList.remove('h');
+  document.getElementById('cam-status').textContent = 'Starting camera…';
+  document.getElementById('cam-status').className   = 'cam-status';
+
+  try{
+    // Request rear camera (environment facing) for phone
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'environment', width:{ideal:640}, height:{ideal:640} }
+    });
+    const video = document.getElementById('cam-video');
+    video.srcObject = camStream;
+    await video.play();
+    camActive = true;
+    document.getElementById('cam-status').textContent = 'Scanning…';
+    // Start decode loop
+    camScanLoop();
+  }catch(err){
+    console.error('Camera error:', err);
+    const msg = err.name==='NotAllowedError'
+      ? '⚠️ Camera permission denied. Allow camera in browser settings.'
+      : '⚠️ Camera not available: '+err.message;
+    document.getElementById('cam-status').textContent = msg;
+    document.getElementById('cam-status').className   = 'cam-status err';
+  }
+}
+
+function closeCamera(){
+  camActive = false;
+  if(camAnimFrame) cancelAnimationFrame(camAnimFrame);
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  const video = document.getElementById('cam-video');
+  video.srcObject = null;
+  document.getElementById('cam-overlay').classList.add('h');
+  camTarget = null;
+}
+
+function camScanLoop(){
+  if(!camActive) return;
+  const video  = document.getElementById('cam-video');
+  const canvas = document.getElementById('cam-canvas');
+  const ctx    = canvas.getContext('2d');
+
+  if(video.readyState !== video.HAVE_ENOUGH_DATA){
+    camAnimFrame = requestAnimationFrame(camScanLoop);
+    return;
+  }
+
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  // Try BarcodeDetector first (native Android Chrome — very fast)
+  if('BarcodeDetector' in window){
+    const bd = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13']});
+    bd.detect(video)
+      .then(barcodes=>{
+        if(barcodes.length > 0){
+          onCodeDetected(barcodes[0].rawValue);
+        } else {
+          camAnimFrame = requestAnimationFrame(camScanLoop);
+        }
+      })
+      .catch(()=>{ camAnimFrame = requestAnimationFrame(camScanLoop); });
+    return;
+  }
+
+  // Fallback: jsQR library
+  if(typeof jsQR !== 'undefined'){
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts:'dontInvert'
+    });
+    if(code && code.data){
+      onCodeDetected(code.data);
+      return;
+    }
+  }
+
+  camAnimFrame = requestAnimationFrame(camScanLoop);
+}
+
+function onCodeDetected(raw){
+  if(!camActive) return;
+  camActive = false; // stop scanning
+
+  // Decode QR string → member ID
+  const memberId = decodeQR(raw);
+
+  document.getElementById('cam-status').textContent = '✅ Found: ' + memberId;
+  document.getElementById('cam-status').className   = 'cam-status found';
+
+  // Brief pause so user sees the success state, then close and fill
+  setTimeout(()=>{
+    closeCamera();
+    if(camTarget === 'entry'){
+      const mi = document.getElementById('mi');
+      mi.value = memberId;
+      // Detect as scanner (fast input)
+      scanMode = true;
+      entryMethod = 'qrcode';
+      updateMethodBadge();
+      lookupMember(memberId);
+    } else if(camTarget === 'dup'){
+      // Switch to ID tab
+      dupTabMode = 'id';
+      document.getElementById('dup-tab-id').classList.add('active');
+      document.getElementById('dup-tab-name').classList.remove('active');
+      document.getElementById('dup-id-panel').style.display   = 'block';
+      document.getElementById('dup-name-panel').style.display = 'none';
+      const dmi = document.getElementById('dup-mi');
+      dmi.value = memberId;
+      dupScanMode = true;
+      dupMethod = 'qrcode';
+      dupRenderMethod();
+      setTimeout(()=> dupLookupMember(memberId), 50);
+    }
+  }, 600);
 }
 
 // ════════════════════════════════════════════════════
@@ -2156,7 +2350,8 @@ async function dupSubmit(){
             autocomplete="off" autocorrect="off" autocapitalize="none"
             spellcheck="false" inputmode="text"
             onkeydown="onDupMK(event)" oninput="onDupMI()">
-          <button class="btn-clear" onclick="resetDupSlip()">✕</button>
+          <button class="btn-cam"   onclick="openCamera('dup')" title="Scan with camera">📷</button>
+          <button class="btn-clear" onclick="resetDupSlip()" title="Clear">✕</button>
         </div>
       </div>
 
@@ -2262,6 +2457,24 @@ async function dupSubmit(){
     <div class="print-status" id="print-status"></div>
   </div>
 </div>
+
+<!-- ════════════════════════════════
+     CAMERA QR SCANNER OVERLAY
+════════════════════════════════ -->
+<div class="cam-overlay h" id="cam-overlay">
+  <div class="cam-header">📷 Point camera at QR Code</div>
+  <div class="cam-video-wrap">
+    <video class="cam-video" id="cam-video" autoplay playsinline muted></video>
+    <canvas class="cam-canvas" id="cam-canvas"></canvas>
+    <div class="cam-crosshair"></div>
+    <div class="cam-scanline"></div>
+  </div>
+  <div class="cam-status" id="cam-status">Initialising camera…</div>
+  <button class="btn-cam-close" onclick="closeCamera()">✕ Cancel</button>
+</div>
+
+<!-- jsQR library for QR decoding from video frames -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
 </body>
 </html>
