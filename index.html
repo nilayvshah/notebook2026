@@ -1089,7 +1089,7 @@ function updateAmount(){
 //  Step 1 — instant from cache (0ms)
 //  Step 2 — live dup check across all users
 // ════════════════════════════════════════════════════
-async function lookupMember(memberId){
+function lookupMember(memberId){
   const mr=document.getElementById('mr');
   const mi=document.getElementById('mi');
   found=null; isDup=false;
@@ -1117,9 +1117,10 @@ async function lookupMember(memberId){
     return;
   }
 
-  // Show member instantly, amber while checking
+  // Show member card immediately — non-blocking .then() for dup check
   const mf=member.is_marksheet_eligible?`<span class="mchip m">🏷️ M</span>`:'';
   mi.className='scan-input chk';
+  mi.blur();
   mr.innerHTML=`
     <div class="mcard chk">
       <span class="mbadge">${esc(member.memberid)}</span>
@@ -1130,49 +1131,47 @@ async function lookupMember(memberId){
     </div>`;
   mr.classList.add('show');
 
-  try{
-    const dup=await api({action:'checkDup',member_id:q});
-    if(dup.duplicate){
-      isDup=true; mi.className='scan-input warn';
-      mi.blur(); // dismiss keyboard
-      mr.innerHTML=`
-        <div class="mcard dup">
-          <span class="mbadge dup">${esc(member.memberid)}</span>
-          <div class="mname">${esc(member.name)}</div>
-          <div class="maddr">📍 ${esc(member.address)}</div>
-          <div class="dup-row">⚠️ Already entered by <strong>${esc(dup.by)}</strong> at <strong>${esc(dup.at)}</strong></div>
-        </div>`;
-    } else {
+  // Non-blocking dup check — same pattern as dupLookupMember
+  api({action:'checkDup', member_id:q})
+    .then(dup=>{
+      if(dup.duplicate){
+        isDup=true; mi.className='scan-input warn';
+        mr.innerHTML=`
+          <div class="mcard dup">
+            <span class="mbadge dup">${esc(member.memberid)}</span>
+            <div class="mname">${esc(member.name)}</div>
+            <div class="maddr">📍 ${esc(member.address)}</div>
+            <div class="dup-row">⚠️ Already entered by <strong>${esc(dup.by)}</strong> at <strong>${esc(dup.at)}</strong></div>
+          </div>`;
+      } else {
+        found=member; mi.className='scan-input ok';
+        mr.innerHTML=`
+          <div class="mcard">
+            <span class="mbadge">${esc(member.memberid)}</span>
+            <div class="mname">${esc(member.name)}</div>
+            <div class="maddr">📍 ${esc(member.address)}</div>
+            <div class="mmeta"><span class="mchip">📌 ${esc(member.pincode)}</span><span class="mchip">📱 ${esc(member.mobile)}</span>${mf}</div>
+          </div>`;
+        if(member.is_marksheet_eligible) showMSRow();
+        setMethod(scanMode?'qrcode':'manual');
+        updateAmount();
+      }
+      updateSubmitBtn();
+      const cont=document.querySelector('#page-entry .entry-body');
+      if(cont) cont.scrollTop=0;
+    })
+    .catch(()=>{
       found=member; mi.className='scan-input ok';
-      mi.blur(); // dismiss keyboard so user can see full result
       mr.innerHTML=`
         <div class="mcard">
           <span class="mbadge">${esc(member.memberid)}</span>
           <div class="mname">${esc(member.name)}</div>
           <div class="maddr">📍 ${esc(member.address)}</div>
-          <div class="mmeta"><span class="mchip">📌 ${esc(member.pincode)}</span><span class="mchip">📱 ${esc(member.mobile)}</span>${mf}</div>
+          <div class="chk-row" style="color:var(--red);">⚠️ Could not verify duplicate</div>
         </div>`;
       if(member.is_marksheet_eligible) showMSRow();
-      setMethod(scanMode?'qrcode':'manual');
-      updateAmount();
-    }
-  }catch(e){
-    found=member; mi.className='scan-input ok';
-    mi.blur(); // dismiss keyboard
-    mr.innerHTML=`
-      <div class="mcard">
-        <span class="mbadge">${esc(member.memberid)}</span>
-        <div class="mname">${esc(member.name)}</div>
-        <div class="maddr">📍 ${esc(member.address)}</div>
-        <div class="chk-row" style="color:var(--red);">⚠️ Could not verify duplicate</div>
-      </div>`;
-    if(member.is_marksheet_eligible) showMSRow();
-    updateAmount();
-  }
-  updateSubmitBtn();
-  // Scroll entry content to top so member result is fully visible
-  const content = document.querySelector('#page-entry .entry-body');
-  if(content) content.scrollTop = 0;
+      updateAmount(); updateSubmitBtn();
+    });
 }
 
 function updateSubmitBtn(){
@@ -2237,7 +2236,7 @@ function onCodeDetected(raw){
       entryMethod  = 'qrcode';
       updateMethodBadge();
       showToast('📷 Scanned: ' + memberId, 'success');
-      lookupMember(memberId);
+      setTimeout(()=> lookupMember(memberId), 50);
 
     } else if(target === 'dup'){
       dupTabMode = 'id';
