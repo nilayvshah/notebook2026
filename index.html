@@ -1099,14 +1099,18 @@ async function lookupMember(memberId){
   const q=memberId.trim().toUpperCase().replace(/\s+/g,'');
   if(!q) return;
 
+  // Show result area immediately so user knows something is happening
+  mr.innerHTML=`<div style="padding:8px;color:var(--muted);font-size:12px;"><span class="sp d"></span> Looking up ${q}…</div>`;
+  mr.classList.add('show');
+
   // Try exact match first, then without leading zeros, then as string
   let member = mmap[q]
-    || mmap[String(parseInt(q,10))]   // numeric: try stripping leading zeros
-    || mmap[q.replace(/^0+/,'')];     // try removing leading zeros
+    || mmap[String(parseInt(q,10))]
+    || mmap[q.replace(/^0+/,'')];
 
   if(!member){
     mi.className='scan-input err';
-    mi.blur(); // dismiss keyboard
+    mi.blur();
     mr.innerHTML=`<div class="mcard nf"><div class="nf-text">✗ Member not found — check ID</div></div>`;
     mr.classList.add('show');
     console.log('Lookup failed for:', q, '| Cache size:', Object.keys(mmap).length, '| Sample keys:', Object.keys(mmap).slice(0,5));
@@ -2233,11 +2237,7 @@ function onCodeDetected(raw){
       entryMethod  = 'qrcode';
       updateMethodBadge();
       showToast('📷 Scanned: ' + memberId, 'success');
-      // Simulate Enter key on the input — triggers exact same flow as manual scan
-      setTimeout(()=>{
-        mi.focus();
-        mi.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
-      }, 150);
+      lookupMember(memberId);
 
     } else if(target === 'dup'){
       dupTabMode = 'id';
@@ -2252,11 +2252,7 @@ function onCodeDetected(raw){
       dupMethod    = 'qrcode';
       dupRenderMethod();
       showToast('📷 Scanned: ' + memberId, 'success');
-      // Simulate Enter key on dup input
-      setTimeout(()=>{
-        dmi.focus();
-        dmi.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
-      }, 150);
+      dupLookupMember(memberId);
 
     } else {
       // target was null or unexpected — show error on screen
