@@ -2236,7 +2236,7 @@ function onCodeDetected(raw){
       entryMethod  = 'qrcode';
       updateMethodBadge();
       showToast('📷 Scanned: ' + memberId, 'success');
-      setTimeout(()=> lookupMember(memberId), 50);
+      lookupMember(memberId);
 
     } else if(target === 'dup'){
       dupTabMode = 'id';
