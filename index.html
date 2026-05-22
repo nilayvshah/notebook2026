@@ -2221,9 +2221,10 @@ function onCodeDetected(raw){
 
   // Show found state for 800ms so user can see it, then close and process
   setTimeout(()=>{
+    const target = camTarget; // save BEFORE closeCamera() nulls it
     closeCamera();
 
-    if(camTarget === 'entry'){
+    if(target === 'entry'){
       // Step 1: fill input field
       const mi = document.getElementById('mi');
       mi.value = memberId;
@@ -2243,7 +2244,7 @@ function onCodeDetected(raw){
         lookupMember(memberId);
       }, 100);
 
-    } else if(camTarget === 'dup'){
+    } else if(target === 'dup'){
       // Switch to ID tab silently
       dupTabMode = 'id';
       document.getElementById('dup-tab-id').classList.add('active');
