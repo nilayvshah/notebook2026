@@ -2114,8 +2114,8 @@ async function dupSubmit(){
 
 // ════════════════════════════════════════════════════
 //  CAMERA QR SCANNER
-//  Uses BarcodeDetector API (Android Chrome built-in) if available
-//  Falls back to jsQR library for video frame decoding
+//  Uses native BarcodeDetector API (Android Chrome built-in)
+//  No external library needed — zero dependency
 // ════════════════════════════════════════════════════
 let camStream    = null;   // active MediaStream
 let camTarget    = null;   // 'entry' | 'dup'
@@ -2137,7 +2137,7 @@ async function openCamera(target){
     video.srcObject = camStream;
     await video.play();
     camActive = true;
-    document.getElementById('cam-status').textContent = 'Scanning…';
+    document.getElementById('cam-status').textContent = 'Point camera at QR code…';
     // Start decode loop
     camScanLoop();
   }catch(err){
@@ -2160,49 +2160,53 @@ function closeCamera(){
   camTarget = null;
 }
 
+// Shared BarcodeDetector instance — created once, reused
+let _barcodeDetector = null;
+
+function getBarcodeDetector(){
+  if(_barcodeDetector) return _barcodeDetector;
+  if(!('BarcodeDetector' in window)) return null;
+  _barcodeDetector = new BarcodeDetector({
+    formats: ['qr_code','code_128','code_39','ean_13','ean_8','upc_a']
+  });
+  return _barcodeDetector;
+}
+
 function camScanLoop(){
   if(!camActive) return;
-  const video  = document.getElementById('cam-video');
-  const canvas = document.getElementById('cam-canvas');
-  const ctx    = canvas.getContext('2d');
+  const video = document.getElementById('cam-video');
+  const bd    = getBarcodeDetector();
 
-  if(video.readyState !== video.HAVE_ENOUGH_DATA){
+  if(!bd){
+    // BarcodeDetector not supported on this device
+    document.getElementById('cam-status').textContent =
+      '⚠️ Camera scanning not supported on this browser. Use Zebra scanner or type ID manually.';
+    document.getElementById('cam-status').className = 'cam-status err';
+    return;
+  }
+
+  if(video.readyState < video.HAVE_ENOUGH_DATA){
     camAnimFrame = requestAnimationFrame(camScanLoop);
     return;
   }
 
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-  // Try BarcodeDetector first (native Android Chrome — very fast)
-  if('BarcodeDetector' in window){
-    const bd = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13']});
-    bd.detect(video)
-      .then(barcodes=>{
-        if(barcodes.length > 0){
-          onCodeDetected(barcodes[0].rawValue);
-        } else {
-          camAnimFrame = requestAnimationFrame(camScanLoop);
-        }
-      })
-      .catch(()=>{ camAnimFrame = requestAnimationFrame(camScanLoop); });
-    return;
-  }
-
-  // Fallback: jsQR library
-  if(typeof jsQR !== 'undefined'){
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts:'dontInvert'
+  // Native BarcodeDetector — zero library, zero canvas needed
+  // Detects directly from the live video element (extremely fast on Android)
+  bd.detect(video)
+    .then(barcodes => {
+      if(!camActive) return;
+      if(barcodes.length > 0){
+        onCodeDetected(barcodes[0].rawValue);
+      } else {
+        // No code yet — scan again next frame
+        camAnimFrame = requestAnimationFrame(camScanLoop);
+      }
+    })
+    .catch(err => {
+      if(!camActive) return;
+      console.warn('BarcodeDetector frame error:', err);
+      camAnimFrame = requestAnimationFrame(camScanLoop);
     });
-    if(code && code.data){
-      onCodeDetected(code.data);
-      return;
-    }
-  }
-
-  camAnimFrame = requestAnimationFrame(camScanLoop);
 }
 
 function onCodeDetected(raw){
@@ -2215,32 +2219,56 @@ function onCodeDetected(raw){
   document.getElementById('cam-status').textContent = '✅ Found: ' + memberId;
   document.getElementById('cam-status').className   = 'cam-status found';
 
-  // Brief pause so user sees the success state, then close and fill
+  // Show found state for 800ms so user can see it, then close and process
   setTimeout(()=>{
     closeCamera();
+
     if(camTarget === 'entry'){
+      // Step 1: fill input field
       const mi = document.getElementById('mi');
       mi.value = memberId;
-      // Detect as scanner (fast input)
-      scanMode = true;
+      mi.className = 'scan-input';
+      // Step 2: set method as qrcode (came from camera = QR)
+      scanMode    = true;
       entryMethod = 'qrcode';
       updateMethodBadge();
-      lookupMember(memberId);
+      // Step 3: trigger lookup — guard if mmap not ready
+      setTimeout(()=>{
+        console.log('Camera → lookupMember:', memberId, '| mmap size:', Object.keys(mmap).length);
+        if(Object.keys(mmap).length === 0){
+          showToast('⚠️ Members not loaded yet. Please wait and try again.','error');
+          mi.value = ''; mi.className = 'scan-input';
+          return;
+        }
+        lookupMember(memberId);
+      }, 100);
+
     } else if(camTarget === 'dup'){
-      // Switch to ID tab
+      // Switch to ID tab silently
       dupTabMode = 'id';
       document.getElementById('dup-tab-id').classList.add('active');
       document.getElementById('dup-tab-name').classList.remove('active');
       document.getElementById('dup-id-panel').style.display   = 'block';
       document.getElementById('dup-name-panel').style.display = 'none';
+      // Fill input
       const dmi = document.getElementById('dup-mi');
-      dmi.value = memberId;
-      dupScanMode = true;
-      dupMethod = 'qrcode';
+      dmi.value    = memberId;
+      dmi.className = 'scan-input';
+      dupScanMode  = true;
+      dupMethod    = 'qrcode';
       dupRenderMethod();
-      setTimeout(()=> dupLookupMember(memberId), 50);
+      // Trigger lookup after short delay
+      setTimeout(()=>{
+        console.log('Camera → dupLookupMember:', memberId, '| mmap size:', Object.keys(mmap).length);
+        if(Object.keys(mmap).length === 0){
+          showToast('⚠️ Members not loaded yet. Please wait and try again.','error');
+          dmi.value = ''; dmi.className = 'scan-input';
+          return;
+        }
+        dupLookupMember(memberId);
+      }, 100);
     }
-  }, 600);
+  }, 800);
 }
 
 // ════════════════════════════════════════════════════
@@ -2473,8 +2501,7 @@ function onCodeDetected(raw){
   <button class="btn-cam-close" onclick="closeCamera()">✕ Cancel</button>
 </div>
 
-<!-- jsQR library for QR decoding from video frames -->
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<!-- BarcodeDetector API used natively — no library needed -->
 
 </body>
 </html>
