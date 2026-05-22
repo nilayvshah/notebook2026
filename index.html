@@ -2211,63 +2211,48 @@ function camScanLoop(){
 
 function onCodeDetected(raw){
   if(!camActive) return;
-  camActive = false; // stop scanning
+  camActive = false;
 
-  // Decode QR string → member ID
+  // Save target NOW before anything can change it
+  const target   = camTarget;
   const memberId = decodeQR(raw);
 
-  document.getElementById('cam-status').textContent = '✅ Found: ' + memberId;
+  // Show on screen for user to see
+  document.getElementById('cam-status').textContent = '✅ Found: ' + memberId + ' [' + target + ']';
   document.getElementById('cam-status').className   = 'cam-status found';
 
-  // Show found state for 800ms so user can see it, then close and process
+  // Close after 800ms and process
   setTimeout(()=>{
-    const target = camTarget; // save BEFORE closeCamera() nulls it
-    closeCamera();
+    closeCamera(); // camTarget becomes null here — but we already saved to target
 
     if(target === 'entry'){
-      // Step 1: fill input field
       const mi = document.getElementById('mi');
-      mi.value = memberId;
+      mi.value     = memberId;
       mi.className = 'scan-input';
-      // Step 2: set method as qrcode (came from camera = QR)
-      scanMode    = true;
-      entryMethod = 'qrcode';
+      scanMode     = true;
+      entryMethod  = 'qrcode';
       updateMethodBadge();
-      // Step 3: trigger lookup — guard if mmap not ready
-      setTimeout(()=>{
-        console.log('Camera → lookupMember:', memberId, '| mmap size:', Object.keys(mmap).length);
-        if(Object.keys(mmap).length === 0){
-          showToast('⚠️ Members not loaded yet. Please wait and try again.','error');
-          mi.value = ''; mi.className = 'scan-input';
-          return;
-        }
-        lookupMember(memberId);
-      }, 100);
+      showToast('📷 Scanned: ' + memberId, 'success');
+      setTimeout(()=> lookupMember(memberId), 150);
 
     } else if(target === 'dup'){
-      // Switch to ID tab silently
       dupTabMode = 'id';
       document.getElementById('dup-tab-id').classList.add('active');
       document.getElementById('dup-tab-name').classList.remove('active');
       document.getElementById('dup-id-panel').style.display   = 'block';
       document.getElementById('dup-name-panel').style.display = 'none';
-      // Fill input
-      const dmi = document.getElementById('dup-mi');
+      const dmi    = document.getElementById('dup-mi');
       dmi.value    = memberId;
       dmi.className = 'scan-input';
       dupScanMode  = true;
       dupMethod    = 'qrcode';
       dupRenderMethod();
-      // Trigger lookup after short delay
-      setTimeout(()=>{
-        console.log('Camera → dupLookupMember:', memberId, '| mmap size:', Object.keys(mmap).length);
-        if(Object.keys(mmap).length === 0){
-          showToast('⚠️ Members not loaded yet. Please wait and try again.','error');
-          dmi.value = ''; dmi.className = 'scan-input';
-          return;
-        }
-        dupLookupMember(memberId);
-      }, 100);
+      showToast('📷 Scanned: ' + memberId, 'success');
+      setTimeout(()=> dupLookupMember(memberId), 150);
+
+    } else {
+      // target was null or unexpected — show error on screen
+      showToast('⚠️ Camera target lost. Got: [' + target + '] raw: ' + raw, 'error', 6000);
     }
   }, 800);
 }
