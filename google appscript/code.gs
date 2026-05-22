@@ -6,11 +6,7 @@
 const MEMBERS_SHEET = 'master_data';
 const ENTRIES_SHEET = 'transaction_data';
 const USERS_SHEET     = 'user_master';
-const DUP_SLIP_SHEET  = 'duplicateslip';
-
-// duplicateslip columns (0-based):
-// A=0 Entry id | B=1 Member_id | C=2 Member Name | D=3 Manav_Rahat
-// E=4 remark | F=5 Userid | G=6 Created on ( Date & time )
+// remark column added to transaction_data (col L=11)
 
 // user_master columns (0-based):
 // A=0 userid | B=1 password | C=2 name | D=3 range_start
@@ -32,9 +28,7 @@ function doGet(e) {
       case 'getSummary':     return jsonResponse(getSummary());                   // admin: summary
       case 'getUserList':    return jsonResponse(getUserList());                  // admin: user dropdown
       case 'updateEntry':    return jsonResponse(updateEntry(p));               // admin: edit entry
-      case 'checkDupSlip':   return jsonResponse(checkDupSlipMember(p.member_id)); // dup slip: validate member
-      case 'addDupSlip':     return jsonResponse(addDupSlip(p));                   // dup slip: save record
-      case 'getDupSlipById': return jsonResponse(getDupSlipById(p.member_id));     // dup slip: get by member
+
       default:               return jsonResponse({ error: 'Unknown action: ' + action });
     }
   } catch (err) {
@@ -186,13 +180,23 @@ function addEntry(p) {
   if (!sheet) return { success: false, error: 'Sheet "' + ENTRIES_SHEET + '" not found.' };
 
   if (sheet.getLastRow() === 0)
-    sheet.appendRow(['Entry id','Member_id','Member Name','Manav_Rahat','Qty','Amount','Userid','Created on ( Date & time )','Marksheet','changedby','updatedon']);
+    sheet.appendRow(['Entry id','Member_id','Member Name','Manav_Rahat','Qty','Amount','Userid','Created on ( Date & time )','Marksheet','changedby','updatedon','remark','comment']);
 
   const now = new Date();
   sheet.appendRow([
-    Number(p.entry_id), p.memberid, p.member_name,
-    p.manav_rahat||'', Number(p.qty), amount,
-    p.logged_by, now, marksheet,
+    Number(p.entry_id),  // Entry id
+    p.memberid,          // Member_id
+    p.member_name,       // Member Name
+    p.manav_rahat||'',   // Manav_Rahat
+    Number(p.qty),       // Qty
+    amount,              // Amount
+    p.logged_by,         // Userid
+    now,                 // Created on
+    marksheet,           // Marksheet
+    '',                  // changedby — empty on new entry
+    '',                  // updatedon — empty on new entry
+    p.remark  || '',     // remark   — e.g. "Duplicate Slip"
+    p.comment || '',     // comment  — user input from Dup Slip form
   ]);
 
   return { success:true, entry_id:Number(p.entry_id), amount, marksheet, timestamp:now.toISOString() };
@@ -363,7 +367,7 @@ function readEntrySheet() {
   const sheet = ss.getSheetByName(ENTRIES_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return [];
 
-  const data    = sheet.getRange(2, 1, sheet.getLastRow()-1, 11).getValues();
+  const data    = sheet.getRange(2, 1, sheet.getLastRow()-1, 13).getValues();
   const entries = [];
   for (let i = 0; i < data.length; i++) {
     const r = data[i];
@@ -380,6 +384,8 @@ function readEntrySheet() {
       marksheet:   String(r[8]||'No').trim(),
       changedby:   String(r[9]||'').trim(),
       changed_on:  r[10] ? new Date(r[10]).toISOString() : '',
+      remark:      String(r[11]||'').trim(),
+      comment:     String(r[12]||'').trim(),
     });
   }
   return entries;
@@ -401,146 +407,7 @@ function getNextEntryId(ss, rangeStart, rangeEnd) {
   return next;
 }
 
-// ════════════════════════════════════════════════════════
-//  checkDupSlipMember
-//  1. Check duplicateslip sheet — if already exists, block and show record
-//  2. If not in dup slip, check transaction_data — show warning if found
-// ════════════════════════════════════════════════════════
-function checkDupSlipMember(memberId) {
-  if (!memberId) return { status: 'error', error: 'member_id required' };
 
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const query = String(memberId).trim().toUpperCase();
-
-  // --- Check 1: duplicateslip sheet ---
-  const dupSheet = ss.getSheetByName(DUP_SLIP_SHEET);
-  if (dupSheet && dupSheet.getLastRow() > 1) {
-    const dupData = dupSheet.getRange(2, 1, dupSheet.getLastRow()-1, 7).getValues();
-    for (let i = 0; i < dupData.length; i++) {
-      const row = dupData[i];
-      if (String(row[1]).trim().toUpperCase() === query) {
-        // Already has a dup slip — BLOCK
-        return {
-          status:      'dup_slip_exists',
-          entry_id:    row[0],
-          member_id:   row[1],
-          member_name: row[2],
-          remark:      row[4],
-          userid:      row[5],
-          created_on:  row[6] ? new Date(row[6]).toISOString() : '',
-          message:     'Duplicate slip already issued for this member.',
-        };
-      }
-    }
-  }
-
-  // --- Check 2: transaction_data sheet ---
-  const txSheet = ss.getSheetByName(ENTRIES_SHEET);
-  if (txSheet && txSheet.getLastRow() > 1) {
-    const txData = txSheet.getRange(2, 1, txSheet.getLastRow()-1, 9).getValues();
-    for (let i = 0; i < txData.length; i++) {
-      const row = txData[i];
-      if (String(row[1]).trim().toUpperCase() === query) {
-        // Found in transaction_data — show warning but allow
-        return {
-          status:      'entry_exists',
-          entry_id:    row[0],
-          member_id:   row[1],
-          member_name: row[2],
-          qty:         row[4],
-          amount:      row[5],
-          userid:      row[6],
-          created_on:  row[7] ? new Date(row[7]).toISOString() : '',
-          marksheet:   row[8] || 'No',
-          message:     'Entry already exists in transaction data.',
-        };
-      }
-    }
-  }
-
-  // --- All clear ---
-  return { status: 'ok' };
-}
-
-// ════════════════════════════════════════════════════════
-//  addDupSlip
-//  Saves a new row to duplicateslip sheet
-//  Entry ID is auto-incremented (simple max+1, single user)
-// ════════════════════════════════════════════════════════
-function addDupSlip(p) {
-  const required = ['member_id', 'member_name', 'userid'];
-  for (const f of required)
-    if (!p[f] || String(p[f]).trim() === '')
-      return { success: false, error: 'Missing: ' + f };
-
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  let   sheet = ss.getSheetByName(DUP_SLIP_SHEET);
-
-  // Create sheet if it doesn't exist
-  if (!sheet) {
-    sheet = ss.insertSheet(DUP_SLIP_SHEET);
-  }
-
-  // Write header if sheet is empty
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['Entry id', 'Member_id', 'Member Name', 'Manav_Rahat', 'remark', 'Userid', 'Created on ( Date & time )']);
-    // Format header row
-    sheet.getRange(1,1,1,7).setFontWeight('bold').setBackground('#1a3060').setFontColor('#ffffff');
-  }
-
-  // Get next entry ID (simple max+1 — single user, no range needed)
-  let nextId = 1;
-  if (sheet.getLastRow() > 1) {
-    const ids = sheet.getRange(2, 1, sheet.getLastRow()-1, 1).getValues();
-    let maxId = 0;
-    for (const row of ids) {
-      const id = Number(row[0]);
-      if (id > maxId) maxId = id;
-    }
-    nextId = maxId + 1;
-  }
-
-  const now = new Date();
-  sheet.appendRow([
-    nextId,
-    String(p.member_id).trim().toUpperCase(),
-    p.member_name,
-    p.manav_rahat || '',
-    p.remark      || '',
-    p.userid,
-    now,
-  ]);
-
-  return { success: true, entry_id: nextId, timestamp: now.toISOString() };
-}
-
-// ════════════════════════════════════════════════════════
-//  getDupSlipById — fetch a dup slip record by member_id
-// ════════════════════════════════════════════════════════
-function getDupSlipById(memberId) {
-  if (!memberId) return { found: false };
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(DUP_SLIP_SHEET);
-  if (!sheet || sheet.getLastRow() < 2) return { found: false };
-
-  const query = String(memberId).trim().toUpperCase();
-  const data  = sheet.getRange(2, 1, sheet.getLastRow()-1, 7).getValues();
-  for (const row of data) {
-    if (String(row[1]).trim().toUpperCase() === query) {
-      return {
-        found:       true,
-        entry_id:    row[0],
-        member_id:   row[1],
-        member_name: row[2],
-        manav_rahat: row[3],
-        remark:      row[4],
-        userid:      row[5],
-        created_on:  row[6] ? new Date(row[6]).toISOString() : '',
-      };
-    }
-  }
-  return { found: false };
-}
 
 function jsonResponse(data) {
   const out = ContentService.createTextOutput(JSON.stringify(data));

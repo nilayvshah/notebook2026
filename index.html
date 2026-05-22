@@ -203,6 +203,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
 .etag.qr {background:#e8fff4;color:#00a362;}
 .etag.man{background:#fff8e8;color:#c47a00;}
 .etag.ms {background:var(--purpleB);color:var(--purple);}
+.etag.dup{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;font-weight:800;}
 .etag.u  {background:var(--tealB);color:var(--teal);}
 
 /* ── DROPDOWN ── */
@@ -236,19 +237,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
 .fuzzy-wrap{position:relative;}
 .fuzzy-input{width:100%;padding:11px 13px;border:2px solid var(--border);border-radius:9px;
   font-size:15px;font-family:var(--sans);font-weight:500;color:var(--text);
-  background:#fff;outline:none;-webkit-appearance:none;}
+  background:#fff;outline:none;-webkit-appearance:none;transition:border-color 0.15s;}
 .fuzzy-input:focus{border-color:var(--purple);}
-.fuzzy-list{
-  position:absolute;top:calc(100% + 4px);left:0;right:0;
+.fuzzy-list{position:absolute;top:calc(100% + 4px);left:0;right:0;
   background:#fff;border:2px solid var(--purple);border-radius:10px;
   box-shadow:0 8px 24px rgba(15,31,61,0.15);z-index:500;
-  max-height:220px;overflow-y:auto;display:none;
-}
+  max-height:200px;overflow-y:auto;display:none;}
 .fuzzy-list.show{display:block;}
-.fuzzy-item{padding:10px 13px;cursor:pointer;border-bottom:1px solid var(--border);
-  transition:background 0.1s;}
+.fuzzy-item{padding:10px 13px;cursor:pointer;border-bottom:1px solid var(--border);}
 .fuzzy-item:last-child{border-bottom:none;}
-.fuzzy-item:active,.fuzzy-item:hover{background:var(--purpleB);}
+.fuzzy-item:active{background:var(--purpleB);}
 .fuzzy-mid{font-family:var(--mono);font-size:10px;color:var(--purple);
   background:var(--purpleB);padding:1px 7px;border-radius:20px;margin-right:6px;}
 .fuzzy-name{font-size:13px;font-weight:600;color:var(--text);}
@@ -256,28 +254,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .fuzzy-hl{background:#fef9c3;border-radius:2px;}
 .fuzzy-empty{padding:12px 13px;font-size:13px;color:var(--muted);text-align:center;}
-.dup-remarks{
-  width:100%;padding:11px 13px;border:2px solid var(--border);border-radius:9px;
-  font-size:14px;font-family:var(--sans);font-weight:500;color:var(--text);
-  background:#fff;outline:none;resize:none;height:70px;
-  transition:border-color 0.15s;-webkit-appearance:none;
-}
-.dup-remarks:focus{border-color:var(--navy);}
-.qr-canvas-wrap{
-  background:#fff;border-radius:var(--r);padding:14px;
-  box-shadow:var(--sh);display:flex;flex-direction:column;
-  align-items:center;gap:8px;flex-shrink:0;
-}
-.qr-string{font-family:var(--mono);font-size:12px;color:var(--muted);
-  letter-spacing:1px;text-align:center;}
-.btn-dup-print{
-  width:100%;padding:15px;background:var(--purple);border:none;border-radius:12px;
-  font-family:var(--mono);font-size:14px;font-weight:700;color:#fff;
-  letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;
-  box-shadow:0 4px 14px rgba(124,58,237,0.3);flex-shrink:0;
-}
-.btn-dup-print:active{background:#6d28d9;}
-.btn-dup-print:disabled{background:var(--border);color:var(--muted);box-shadow:none;cursor:not-allowed;}
+.dup-badge{display:inline-block;background:var(--purple);color:#fff;
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:4px;}
 
 /* ── PRINT DIALOG ── */
 .print-dialog{
@@ -1332,12 +1310,18 @@ function renderEntryList(entries,cId,tId,mId,listId,showUser){
   document.getElementById(mId).textContent=msc;
   if(!cnt){ document.getElementById(listId).innerHTML=`<div class="empty">📭<br><span style="font-size:13px;">No entries</span></div>`; return; }
   document.getElementById(listId).innerHTML=entries.slice().reverse().map(e=>{
-    const ms=e.marksheet==='Yes';
-    const uTag=showUser?`<span class="etag u">👤 ${esc(e.userid)}</span>`:'';
-    const editBtn=showUser?`<button onclick="openEditModal(${JSON.stringify(e).replace(/"/g,'&quot;')})" style="background:var(--navy);border:none;color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;cursor:pointer;font-family:var(--sans);flex-shrink:0;">✏️ Edit</button>`:'';
-    return`<div class="ecard ${ms?'ms':''}">
+    const ms  = e.marksheet==='Yes';
+    const isDup = (e.remark||'').startsWith('Duplicate Slip');
+    const uTag  = showUser?`<span class="etag u">👤 ${esc(e.userid)}</span>`:'';
+    const editBtn = showUser?`<button onclick="openEditModal(${JSON.stringify(e).replace(/"/g,'&quot;')})" style="background:var(--navy);border:none;color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;cursor:pointer;font-family:var(--sans);flex-shrink:0;">✏️ Edit</button>`:'';
+    const dupTag  = isDup ? `<span class="etag dup">🔖 D</span>` : '';
+    const comment = e.comment ? `<span class="etag" style="background:#f0f9ff;color:#0891b2;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(e.comment)}">💬 ${esc(e.comment)}</span>` : '';
+    return`<div class="ecard ${ms?'ms':''}" style="${isDup?'border-left-color:#dc2626;':''}">
       <div class="ech">
-        <span class="eid">#${e.entry_id}</span>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <span class="eid">#${e.entry_id}</span>
+          ${dupTag}
+        </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="eamt ${ms?'z':''}">₹${Number(e.amount).toLocaleString('en-IN')}</span>
           ${editBtn}
@@ -1350,6 +1334,7 @@ function renderEntryList(entries,cId,tId,mId,listId,showUser){
         ${!ms?`<span class="etag ${e.entry_method==='qrcode'?'qr':'man'}">${e.entry_method==='qrcode'?'📷 QR':'✏️ Manual'}</span>`:''}
         ${ms?`<span class="etag ms">📄 Marksheet</span>`:''}
         ${uTag}
+        ${comment}
         <span class="etag">${fmtTs(e.created_on)}</span>
         ${e.changed_on?`<span class="etag" style="background:#fff3cd;color:#856404;">✏️ Edited ${fmtTs(e.changed_on)} by ${esc(e.changedby||'')}</span>`:''}
       </div>
@@ -1721,110 +1706,130 @@ function goDupSlip(){
   resetDupSlip();
 }
 
-let dupTab = 'id'; // 'id' or 'name'
+// ════════════════════════════════════════════════════
+//  DUP SLIP — mirrors Entry form, saves to transaction_data
+//  with remark = "Duplicate Slip"
+// ════════════════════════════════════════════════════
+let dupFound    = null;
+let dupQIdx     = 2;          // default qty index (30)
+let dupMethod   = 'qrcode';
+let dupScanMode = true;
+let dupLastKT   = 0;
+let dupTabMode  = 'id';       // 'id' | 'name'
 
-function setDupTab(tab){
-  dupTab = tab;
-  document.getElementById('tab-id').classList.toggle('active', tab==='id');
-  document.getElementById('tab-name').classList.toggle('active', tab==='name');
-  document.getElementById('dup-id-panel').style.display   = tab==='id'   ? 'block' : 'none';
-  document.getElementById('dup-name-panel').style.display = tab==='name' ? 'block' : 'none';
-  // Clear result when switching tabs
-  document.getElementById('dup-mr').innerHTML = '';
-  document.getElementById('dup-mr').classList.remove('show');
-  hideFuzzyList();
-  dupMember = null;
-  document.getElementById('dup-remarks-card').style.display = 'none';
-  document.getElementById('dup-qr-wrap').style.display = 'none';
-  document.getElementById('btn-dup-print').style.display = 'none';
-  // Do NOT auto-focus here — prevents keyboard from popping up unexpectedly
-  // User can tap the field when ready
+function goDupSlip(){
+  showPage('dupslip');
+  resetDupSlip();
 }
 
 function resetDupSlip(){
-  dupMember = null;
+  dupFound = null;
+  // Clear ID input
   const mi = document.getElementById('dup-mi');
   mi.value = ''; mi.className = 'scan-input';
+  // Clear name input
   document.getElementById('dup-name-input').value = '';
+  document.getElementById('dup-comment').value = '';
+  hideFuzzyList();
+  // Clear result
   document.getElementById('dup-mr').innerHTML = '';
   document.getElementById('dup-mr').classList.remove('show');
-  document.getElementById('dup-remarks-card').style.display = 'none';
-  document.getElementById('dup-qr-wrap').style.display = 'none';
-  document.getElementById('btn-dup-print').style.display = 'none';
-  document.getElementById('dup-remarks').value = '';
-  hideFuzzyList();
-  // Clear QR canvas
-  const canvas = document.getElementById('dup-qr-canvas');
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  setTimeout(()=>{
-    if(dupTab==='id') document.getElementById('dup-mi').focus();
-    else              document.getElementById('dup-name-input').focus();
-  },150);
+  // Hide marksheet
+  document.getElementById('dup-msr').classList.remove('show');
+  document.getElementById('dup-mscb').checked = false;
+  // Reset qty
+  dupQIdx = 2;
+  document.getElementById('dup-qval').textContent = '30';
+  // Reset method
+  dupMethod = 'qrcode'; dupRenderMethod();
+  // Reset amount
+  dupUpdateAmount();
+  // Reset submit btn
+  const btn = document.getElementById('dup-bsub');
+  btn.disabled = false;
+  btn.innerHTML = '🔖 SUBMIT DUPLICATE SLIP';
+  // Focus ID input
+  setTimeout(()=>{ document.getElementById('dup-mi').focus(); }, 150);
 }
 
-// ── Fuzzy name search ──────────────────────────────────────
+// ── Tab switching ─────────────────────────────────────
+function setDupTab(tab){
+  dupTabMode = tab;
+  document.getElementById('dup-tab-id').classList.toggle('active',   tab==='id');
+  document.getElementById('dup-tab-name').classList.toggle('active', tab==='name');
+  document.getElementById('dup-id-panel').style.display   = tab==='id'   ? 'block' : 'none';
+  document.getElementById('dup-name-panel').style.display = tab==='name' ? 'block' : 'none';
+  // Clear result when switching
+  dupFound = null;
+  document.getElementById('dup-mr').innerHTML = '';
+  document.getElementById('dup-mr').classList.remove('show');
+  document.getElementById('dup-msr').classList.remove('show');
+  hideFuzzyList();
+  dupUpdateAmount();
+}
+
+// ── Scanner detection ─────────────────────────────────
+function onDupMI(){
+  const now=Date.now(), d=now-dupLastKT; dupLastKT=now;
+  if(d<80) dupScanMode=true;
+  else if(document.getElementById('dup-mi').value.length<=1) dupScanMode=true;
+  else dupScanMode=false;
+}
+function onDupMK(e){
+  if(e.key!=='Enter') return;
+  e.preventDefault();
+  const raw = document.getElementById('dup-mi').value.trim();
+  if(!raw) return;
+  const v = decodeQR(raw);
+  if(v !== raw) document.getElementById('dup-mi').value = v;
+  dupMethod = dupScanMode ? 'qrcode' : 'manual';
+  dupRenderMethod();
+  dupLookupMember(v);
+}
+
+// ── Fuzzy name search ─────────────────────────────────
 function onDupNameInput(){
   const q = document.getElementById('dup-name-input').value.trim();
   if(q.length < 2){ hideFuzzyList(); return; }
-  const results = fuzzySearchMembers(q, 8);
+  const results = dupFuzzySearch(q, 8);
   renderFuzzyList(results, q);
 }
 
-// Simple fuzzy: score by consecutive match and word-start match
-function fuzzySearchMembers(query, maxResults){
+function dupFuzzySearch(query, max){
   const q = query.toUpperCase();
   const words = q.split(/\s+/).filter(Boolean);
   const results = [];
-
   for(const key in mmap){
     const m = mmap[key];
     const name = (m.name||'').toUpperCase();
-    let score = 0;
-
-    // All words must appear somewhere in the name
     let allMatch = true;
-    for(const w of words){
-      if(name.indexOf(w) === -1){ allMatch=false; break; }
-    }
+    for(const w of words){ if(name.indexOf(w)===-1){ allMatch=false; break; } }
     if(!allMatch) continue;
-
-    // Scoring: consecutive full-string match = high, word-start match = medium
-    if(name.indexOf(q) !== -1) score += 100;          // full query found
+    let score = name.indexOf(q)!==-1 ? 100 : 0;
     for(const w of words){
-      if(name.startsWith(w)) score += 50;              // starts with word
-      const parts = name.split(' ');
-      for(const p of parts) if(p.startsWith(w)) score += 20; // word-boundary match
+      name.split(' ').forEach(p=>{ if(p.startsWith(w)) score+=20; });
     }
-    score += (100 - Math.abs(name.length - q.length)); // prefer similar length
-
-    results.push({ member: m, score });
+    results.push({member:m, score});
   }
-
-  results.sort((a,b) => b.score - a.score);
-  return results.slice(0, maxResults).map(r => r.member);
+  results.sort((a,b)=>b.score-a.score);
+  return results.slice(0,max).map(r=>r.member);
 }
 
 function renderFuzzyList(results, query){
-  const list = document.getElementById('fuzzy-list');
+  const list = document.getElementById('dup-fuzzy-list');
   if(!results.length){
     list.innerHTML = `<div class="fuzzy-empty">No members found</div>`;
-    list.classList.add('show');
-    return;
+    list.classList.add('show'); return;
   }
-
-  const qUpper = query.toUpperCase();
-  list.innerHTML = results.map(m => {
-    // Highlight matching part in name
-    const name = m.name || '';
-    const idx  = name.toUpperCase().indexOf(qUpper);
+  const qU = query.toUpperCase();
+  list.innerHTML = results.map(m=>{
+    const name = m.name||'';
+    const idx  = name.toUpperCase().indexOf(qU);
     let hlName = esc(name);
-    if(idx !== -1){
-      hlName = esc(name.slice(0,idx))
-             + `<span class="fuzzy-hl">${esc(name.slice(idx, idx+query.length))}</span>`
-             + esc(name.slice(idx+query.length));
-    }
-    return `<div class="fuzzy-item" onmousedown="selectFuzzyMember('${esc(m.memberid)}')">
+    if(idx!==-1) hlName = esc(name.slice(0,idx))
+      +`<span class="fuzzy-hl">${esc(name.slice(idx,idx+query.length))}</span>`
+      +esc(name.slice(idx+query.length));
+    return `<div class="fuzzy-item" onmousedown="selectDupFuzzy('${esc(m.memberid)}')">
       <div><span class="fuzzy-mid">${esc(m.memberid)}</span><span class="fuzzy-name">${hlName}</span></div>
       <div class="fuzzy-addr">📍 ${esc(m.address)}</div>
     </div>`;
@@ -1832,54 +1837,39 @@ function renderFuzzyList(results, query){
   list.classList.add('show');
 }
 
-function selectFuzzyMember(memberid){
+function selectDupFuzzy(memberid){
   hideFuzzyList();
   document.getElementById('dup-name-input').value = '';
-  // Switch to ID tab — but do NOT focus (avoids keyboard/layout freeze on Android)
-  dupTab = 'id';
-  document.getElementById('tab-id').classList.add('active');
-  document.getElementById('tab-name').classList.remove('active');
+  // Switch to ID tab silently (no focus)
+  dupTabMode = 'id';
+  document.getElementById('dup-tab-id').classList.add('active');
+  document.getElementById('dup-tab-name').classList.remove('active');
   document.getElementById('dup-id-panel').style.display   = 'block';
   document.getElementById('dup-name-panel').style.display = 'none';
   document.getElementById('dup-mi').value = memberid;
-  // Defer lookup so DOM settles before async API call
-  setTimeout(()=> lookupDupMember(memberid), 50);
+  // Defer lookup so DOM settles
+  setTimeout(()=> dupLookupMember(memberid), 50);
 }
 
 function hideFuzzyList(){
-  // Small delay so click on item fires before blur hides list
   setTimeout(()=>{
-    const list = document.getElementById('fuzzy-list');
-    if(list) list.classList.remove('show');
-  }, 200);
+    const l=document.getElementById('dup-fuzzy-list'); if(l) l.classList.remove('show');
+  },200);
 }
 
-function onDupMK(e){
-  if(e.key !== 'Enter') return;
-  e.preventDefault();
-  const raw = document.getElementById('dup-mi').value.trim();
-  if(!raw) return;
-  // Decode QR if needed (user might scan instead of type)
-  const memberId = decodeQR(raw);
-  if(memberId !== raw) document.getElementById('dup-mi').value = memberId;
-  lookupDupMember(memberId);
-}
-
-// lookupDupMember — INSTANT, local cache only, zero API calls
-// Validation happens later when user taps Print
-function lookupDupMember(memberId){
+// ── Member lookup — instant from cache ───────────────
+function dupLookupMember(memberId){
   const mr = document.getElementById('dup-mr');
   const mi = document.getElementById('dup-mi');
-  dupMember = null;
+  dupFound = null;
   mi.className = 'scan-input';
-  document.getElementById('dup-remarks-card').style.display = 'none';
-  document.getElementById('dup-qr-wrap').style.display = 'none';
-  document.getElementById('btn-dup-print').style.display = 'none';
+  document.getElementById('dup-msr').classList.remove('show');
+  document.getElementById('dup-mscb').checked = false;
+  dupUpdateAmount();
 
   const q = memberId.trim().toUpperCase().replace(/\s+/g,'');
   if(!q) return;
 
-  // Instant lookup from local mmap cache — no API call
   const member = mmap[q];
   if(!member){
     mi.className = 'scan-input err';
@@ -1889,13 +1879,13 @@ function lookupDupMember(memberId){
     return;
   }
 
-  // Member found — show info instantly
-  dupMember = member;
-  mi.className = 'scan-input ok';
+  // Show member — then do live dup check
+  dupFound = member;
+  mi.className = 'scan-input chk';
   mi.blur();
   const mf = member.is_marksheet_eligible ? `<span class="mchip m">🏷️ M</span>` : '';
   mr.innerHTML = `
-    <div class="mcard">
+    <div class="mcard chk">
       <span class="mbadge">${esc(member.memberid)}</span>
       <div class="mname">${esc(member.name)}</div>
       <div class="maddr">📍 ${esc(member.address)}</div>
@@ -1903,300 +1893,160 @@ function lookupDupMember(memberId){
         <span class="mchip">📌 ${esc(member.pincode)}</span>
         <span class="mchip">📱 ${esc(member.mobile)}</span>${mf}
       </div>
+      <div class="chk-row"><span class="sp a"></span> Checking duplicate…</div>
     </div>`;
   mr.classList.add('show');
-
-  // Show remarks + QR immediately
-  document.getElementById('dup-remarks-card').style.display = 'block';
-  generateDupQR(member.memberid);
-  // Print button shows with "Validate & Print" label
-  const btn = document.getElementById('btn-dup-print');
-  btn.style.display = 'block';
-  btn.textContent = '🖨️ VALIDATE & PRINT';
-}
-
-
-function onDupMK(e){
-  if(e.key !== 'Enter') return;
-  e.preventDefault();
-  const raw = document.getElementById('dup-mi').value.trim();
-  if(!raw) return;
-  // Decode QR if needed (user might scan instead of type)
-  const memberId = decodeQR(raw);
-  if(memberId !== raw) document.getElementById('dup-mi').value = memberId;
-  lookupDupMember(memberId);
-}
-
-
-
-// ── Encode member ID → QR string ──
-// Reverse of decodeQR:
-// Input: A1  → Output: 2026105A   (2026 + numeric + month(2digit) + alpha)
-// Input: R131 → Output: 202613105R
-// Input: BH25 → Output: 20262505BH
-function encodeQR(memberId){
-  const s = memberId.trim().toUpperCase();
-  // Split into alpha prefix and numeric part
-  const match = s.match(/^([A-Z]{1,2})(\d+)$/);
-  if(!match) return s; // can't encode — return as-is
-
-  const alpha   = match[1];               // e.g. "A", "R", "BH"
-  const numeric = match[2];               // e.g. "1", "131", "25"
-  const year    = new Date().getFullYear(); // e.g. 2026
-  const month   = String(new Date().getMonth()+1).padStart(2,'0'); // e.g. "05"
-
-  return String(year) + numeric + month + alpha;
-  // A1   → 2026 + 1  + 05 + A  = 2026105A
-  // R131 → 2026 + 131+ 05 + R  = 202613105R
-  // BH25 → 2026 + 25 + 05 + BH = 20262505BH
-}
-
-// ── Generate QR code on canvas using pure JS ──
-// Uses qrcode-generator library loaded from CDN
-function generateDupQR(memberId){
-  const qrString = encodeQR(memberId);
-  document.getElementById('dup-qr-string').textContent = qrString;
-  document.getElementById('dup-qr-wrap').style.display = 'flex';
-
-  // Draw QR using the loaded library
-  try{
-    const qr = window.qrcode(0, 'M');
-    qr.addData(qrString);
-    qr.make();
-    const canvas  = document.getElementById('dup-qr-canvas');
-    const ctx     = canvas.getContext('2d');
-    const modules = qr.getModuleCount();
-    const size    = 160;
-    const cell    = size / modules;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0,0,size,size);
-    ctx.fillStyle = '#000';
-    for(let r=0; r<modules; r++){
-      for(let c=0; c<modules; c++){
-        if(qr.isDark(r,c)){
-          ctx.fillRect(c*cell, r*cell, cell, cell);
-        }
-      }
-    }
-    console.log('QR generated:', qrString);
-  }catch(err){
-    console.error('QR generation error:', err);
-    document.getElementById('dup-qr-string').textContent = qrString + ' (QR lib not loaded)';
+  if(member.is_marksheet_eligible){
+    document.getElementById('dup-msr').classList.add('show');
   }
-}
+  dupUpdateAmount();
 
-// ── Print Dup Slip via Bluetooth — saves to sheet first ──
-async function printDupSlip(){
-  if(!dupMember){ return; }
-
-  const btn = document.getElementById('btn-dup-print');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="sp"></span>Validating…';
-
-  const remark = (document.getElementById('dup-remarks').value||'').trim();
-
-  // Step 1 — validate: check if dup slip already exists (fast API call)
-  try{
-    const chk = await api({action:'checkDupSlip', member_id: dupMember.memberid});
-
-    if(chk.status === 'dup_slip_exists'){
-      // Already issued — block and show info on screen
-      const mr = document.getElementById('dup-mr');
-      const mf = dupMember.is_marksheet_eligible ? `<span class="mchip m">🏷️ M</span>` : '';
-      mr.innerHTML = `
-        <div class="mcard dup">
-          <span class="mbadge dup">${esc(dupMember.memberid)}</span>
-          <div class="mname">${esc(dupMember.name)}</div>
-          <div class="maddr">📍 ${esc(dupMember.address)}</div>
-          <div class="dup-row">
-            🚫 <strong>Duplicate slip already issued</strong><br>
-            Slip #${esc(String(chk.entry_id))} by <strong>${esc(chk.userid)}</strong>
-            on ${fmtTs(chk.created_on)}
-            ${chk.remark ? '<br>Remark: '+esc(chk.remark) : ''}
-          </div>
-        </div>`;
-      mr.classList.add('show');
-      document.getElementById('btn-dup-print').style.display = 'none';
-      showToast('🚫 Dup slip already issued for this member', 'error');
-      btn.disabled = false; btn.innerHTML = '🖨️ VALIDATE & PRINT';
-      return;
-    }
-    // entry_exists or ok — both allow printing
-  }catch(e){
-    // Network error during validation — warn but allow
-    showToast('⚠️ Validation skipped — network error', 'warning');
-  }
-
-  // Step 2 — save record
-  btn.innerHTML = '<span class="sp"></span>Saving…';
-  try{
-    const saved = await api({
-      action:      'addDupSlip',
-      member_id:   dupMember.memberid,
-      member_name: dupMember.name,
-      manav_rahat: dupMember.manav_rahat || '',
-      remark:      remark,
-      userid:      cUser,
-    });
-    if(!saved.success){
-      showToast('❌ Save failed: '+(saved.error||'Unknown'), 'error');
-      btn.disabled = false; btn.innerHTML = '🖨️ VALIDATE & PRINT';
-      return;
-    }
-    showToast('✅ Dup Slip #'+saved.entry_id+' saved', 'success');
-  }catch(e){
-    showToast('⚠️ Could not save — printing anyway', 'warning');
-  }
-
-  btn.innerHTML = '<span class="sp"></span>Printing…';
-
-  if(!navigator.bluetooth){
-    showToast('⚠️ Bluetooth not supported. Use Chrome.','error');
-    btn.disabled = false; btn.innerHTML = '🖨️ PRINT DUPLICATE SLIP';
-    return;
-  }
-
-  try{
-    // Reuse existing BT connection or connect fresh
-    if(!btCharacteristic){
-      btDevice = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices:[
-          'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-          '49535343-fe7d-4ae5-8fa9-9fafd205e455',
-          '000018f0-0000-1000-8000-00805f9b34fb',
-        ],
-      });
-      const server = await btDevice.gatt.connect();
-      const serviceUUIDs = [
-        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
-        '000018f0-0000-1000-8000-00805f9b34fb',
-      ];
-      let service = null;
-      for(const uuid of serviceUUIDs){
-        try{ service = await server.getPrimaryService(uuid); break; }catch(e){}
-      }
-      if(!service){
-        const services = await server.getPrimaryServices();
-        if(services.length>0) service = services[0];
-      }
-      if(!service) throw new Error('No compatible printer service found');
-      const chars = await service.getCharacteristics();
-      btCharacteristic = null;
-      for(const c of chars){
-        if(c.properties.write || c.properties.writeWithoutResponse){
-          btCharacteristic = c; break;
-        }
-      }
-      if(!btCharacteristic) throw new Error('No writable characteristic');
-    }
-
-    const printData = buildDupSlipEscPos();
-    const CHUNK = 512;
-    for(let i=0; i<printData.length; i+=CHUNK){
-      const chunk = printData.slice(i,i+CHUNK);
-      if(btCharacteristic.properties.writeWithoutResponse){
-        await btCharacteristic.writeValueWithoutResponse(chunk);
+  // Live dup check (same as entry form — checks transaction_data for today)
+  api({action:'checkDup', member_id:q})
+    .then(dup=>{
+      if(dup.duplicate){
+        dupFound = null;
+        mi.className = 'scan-input warn';
+        mr.innerHTML = `
+          <div class="mcard dup">
+            <span class="mbadge dup">${esc(member.memberid)}</span>
+            <div class="mname">${esc(member.name)}</div>
+            <div class="maddr">📍 ${esc(member.address)}</div>
+            <div class="dup-row">⚠️ Already entered today by <strong>${esc(dup.by)}</strong> at <strong>${esc(dup.at)}</strong></div>
+          </div>`;
+        document.getElementById('dup-msr').classList.remove('show');
       } else {
-        await btCharacteristic.writeValue(chunk);
+        dupFound = member;
+        mi.className = 'scan-input ok';
+        mr.innerHTML = `
+          <div class="mcard">
+            <span class="mbadge">${esc(member.memberid)}</span>
+            <div class="mname">${esc(member.name)}</div>
+            <div class="maddr">📍 ${esc(member.address)}</div>
+            <div class="mmeta">
+              <span class="mchip">📌 ${esc(member.pincode)}</span>
+              <span class="mchip">📱 ${esc(member.mobile)}</span>${mf}
+            </div>
+          </div>`;
       }
-      await new Promise(r=>setTimeout(r,50));
-    }
-    showToast('✅ Dup Slip printed!','success');
-  }catch(err){
-    console.error('Dup print error:',err);
-    btCharacteristic = null;
-    if(err.name==='NotFoundError') showToast('No printer selected','warning');
-    else showToast('❌ '+err.message,'error');
-  }
-  btn.disabled = false;
-  btn.innerHTML = '🖨️ PRINT DUPLICATE SLIP';
+    })
+    .catch(()=>{
+      // Network error — allow with warning
+      dupFound = member;
+      mi.className = 'scan-input ok';
+      mr.innerHTML = `
+        <div class="mcard">
+          <span class="mbadge">${esc(member.memberid)}</span>
+          <div class="mname">${esc(member.name)}</div>
+          <div class="maddr">📍 ${esc(member.address)}</div>
+          <div class="chk-row" style="color:var(--red);">⚠️ Could not verify duplicate</div>
+        </div>`;
+    });
 }
 
-// ── Build ESC/POS for Dup Slip ──
-function buildDupSlipEscPos(){
-  const enc  = new TextEncoder();
-  const ESC  = 0x1B, GS = 0x1D, LF = 0x0A;
-  const INIT         = [ESC,0x40];
-  const ALIGN_CENTER = [ESC,0x61,0x01];
-  const ALIGN_LEFT   = [ESC,0x61,0x00];
-  const BOLD_ON      = [ESC,0x45,0x01];
-  const BOLD_OFF     = [ESC,0x45,0x00];
-  const BIG          = [ESC,0x21,0x30]; // double width + double height
-  const NORMAL       = [ESC,0x21,0x00];
-  const CUT          = [GS, 0x56,0x41,0x10];
+// ── Qty ───────────────────────────────────────────────
+const DUP_QTY=[10,20,30];
+function dupChangeQty(dir){
+  dupQIdx=Math.max(0,Math.min(DUP_QTY.length-1,dupQIdx+dir));
+  document.getElementById('dup-qval').textContent=DUP_QTY[dupQIdx];
+  dupUpdateAmount();
+}
+function dupGetQty(){ return DUP_QTY[dupQIdx]; }
 
-  function txt(s){ return Array.from(enc.encode(s)); }
-  function line(s=''){ return [...txt(s),LF]; }
-  function sep(){ return line('--------------------------------'); }
-
-  const remarks  = (document.getElementById('dup-remarks').value||'').trim();
-  const qrString = encodeQR(dupMember.memberid);
-  const dt       = new Date().toLocaleString('en-IN',{
-    day:'2-digit',month:'short',year:'numeric',
-    hour:'2-digit',minute:'2-digit',hour12:true
-  });
-
-  const bytes = [
-    ...INIT,
-    ...ALIGN_CENTER,
-    ...BOLD_ON,
-    ...BIG,
-    ...line('DUPLICATE SLIP'),
-    ...NORMAL,
-    ...BOLD_OFF,
-    ...sep(),
-    ...ALIGN_LEFT,
-    ...BOLD_ON,  ...txt('Member ID  : '), ...BOLD_OFF, ...line(dupMember.memberid),
-    ...BOLD_ON,  ...txt('Name       : '), ...BOLD_OFF, ...line(dupMember.name),
-    ...BOLD_ON,  ...txt('Address    : '), ...BOLD_OFF,
-    // Word-wrap address to fit 32 chars per line
-    ...wrapText(dupMember.address, 32),
-    ...line(''),
-    ...BOLD_ON,  ...txt('QR Code    : '), ...BOLD_OFF, ...line(qrString),
-  ];
-
-  if(remarks){
-    bytes.push(
-      ...BOLD_ON, ...txt('Remarks    : '), ...BOLD_OFF,
-      ...wrapText(remarks, 32),
-    );
+// ── Method ────────────────────────────────────────────
+function dupToggleMethod(){
+  dupMethod = dupMethod==='qrcode'?'manual':'qrcode';
+  dupRenderMethod(); dupUpdateAmount();
+}
+function dupRenderMethod(){
+  const pill=document.getElementById('dup-mpill');
+  const oqr=document.getElementById('dup-mopt-qr');
+  const omn=document.getElementById('dup-mopt-man');
+  if(dupMethod==='qrcode'){
+    pill.className='mt-pill qr'; oqr.classList.add('active'); omn.classList.remove('active');
+  } else {
+    pill.className='mt-pill manual'; omn.classList.add('active'); oqr.classList.remove('active');
   }
-
-  bytes.push(
-    ...sep(),
-    ...ALIGN_LEFT,
-    ...BOLD_ON, ...txt('Issued By  : '), ...BOLD_OFF,
-    ...line((cName||cUser)+' ('+cUser+')'),
-    ...line(dt),
-    ...sep(),
-    ...line(''), ...line(''), ...line(''),
-    ...CUT,
-  );
-
-  return new Uint8Array(bytes);
 }
 
-// ── Word wrap helper for narrow thermal paper ──
-function wrapText(text, maxLen){
-  const LF = 0x0A;
-  const enc = new TextEncoder();
-  const words = text.split(' ');
-  const lines = [];
-  let cur = '';
-  for(const w of words){
-    if((cur+' '+w).trim().length > maxLen){
-      if(cur) lines.push(cur.trim());
-      cur = w;
+// ── Marksheet ─────────────────────────────────────────
+function dupIsMS(){
+  return document.getElementById('dup-msr').classList.contains('show')
+      && document.getElementById('dup-mscb').checked;
+}
+
+// ── Amount ────────────────────────────────────────────
+function dupCalcAmt(){
+  if(dupIsMS()) return 0;
+  const q=dupGetQty();
+  if(q===30) return dupMethod==='qrcode'?500:600;
+  if(q===20) return 400;
+  if(q===10) return 200;
+  return 0;
+}
+function dupUpdateAmount(){
+  const a=dupCalcAmt();
+  const d=document.getElementById('dup-aval');
+  d.textContent='₹'+a;
+  d.className='amt-val'+(dupIsMS()?' zero':'');
+  document.getElementById('dup-anote').textContent=dupIsMS()?'Marksheet — no charge':'';
+}
+
+// ── Submit ────────────────────────────────────────────
+async function dupSubmit(){
+  if(!dupFound){ showToast('Scan or select a valid Member ID','error'); return; }
+  const btn = document.getElementById('dup-bsub');
+  btn.disabled=true; btn.innerHTML='<span class="sp"></span>Saving…';
+
+  const ms  = dupIsMS()?'Yes':'No';
+  const amt = dupCalcAmt();
+  const eid = nxtId; // uses same entry ID counter as main entry
+
+  try{
+    const d = await api({
+      action:       'addEntry',
+      entry_id:     eid,
+      memberid:     dupFound.memberid,
+      member_name:  dupFound.name,
+      manav_rahat:  dupFound.manav_rahat||'',
+      qty:          dupGetQty(),
+      entry_method: dupMethod,
+      amount:       amt,
+      marksheet:    ms,
+      logged_by:    cUser,
+      remark:       'Duplicate Slip',
+      comment:      (document.getElementById('dup-comment').value||'').trim(),
+    });
+    if(d.success){
+      nxtId=eid+1; sessionStorage.setItem('ni',String(nxtId));
+      // Show last entry strip
+      document.getElementById('dup-le-id').textContent   = '#'+eid;
+      document.getElementById('dup-le-mid').textContent  = dupFound.memberid;
+      document.getElementById('dup-le-name').textContent = dupFound.name;
+      document.getElementById('dup-le-qty').textContent  = 'Qty:'+dupGetQty();
+      document.getElementById('dup-le-amt').textContent  = ms==='Yes'?'₹0 📄':'₹'+d.amount;
+      document.getElementById('dup-last-entry').classList.add('show');
+      showToast(`✅ Dup Slip #${eid} saved — ₹${d.amount}`, 'success', 5000);
+      // Reset form fields but keep last entry strip
+      dupFound=null;
+      const mi=document.getElementById('dup-mi');
+      mi.value=''; mi.className='scan-input';
+      document.getElementById('dup-comment').value='';
+      document.getElementById('dup-mr').innerHTML='';
+      document.getElementById('dup-mr').classList.remove('show');
+      document.getElementById('dup-msr').classList.remove('show');
+      document.getElementById('dup-mscb').checked=false;
+      dupQIdx=2; document.getElementById('dup-qval').textContent='30';
+      dupMethod='qrcode'; dupRenderMethod(); dupUpdateAmount();
+      focusMI(true); // keep scanner ready
     } else {
-      cur = (cur+' '+w).trim();
+      showToast('❌ '+(d.error||'Error'),'error');
+      btn.disabled=false; btn.innerHTML='🔖 SUBMIT DUPLICATE SLIP';
     }
+  }catch(e){
+    showToast('⚠️ Network error. Try again.','error');
+    btn.disabled=false; btn.innerHTML='🔖 SUBMIT DUPLICATE SLIP';
   }
-  if(cur) lines.push(cur.trim());
-  const bytes = [];
-  for(const l of lines){ bytes.push(...Array.from(enc.encode(l)), LF); }
-  return bytes;
 }
 
 // ════════════════════════════════════════════════════
@@ -2286,63 +2136,112 @@ function wrapText(text, maxLen){
 <div class="page" id="page-dupslip">
   <div class="topbar">
     <button class="btn-back" onclick="goEntry()">← Back</button>
-    <div class="topbar-title" style="color:#c4b5fd;">🔖 Duplicate Slip</div>
-    <button class="btn-refresh" onclick="resetDupSlip()">↺</button>
+    <div class="topbar-title">🔖 Duplicate Slip <span class="dup-badge">DUP</span></div>
+    <button class="btn-refresh" onclick="resetDupSlip()">↺ Reset</button>
   </div>
   <div class="entry-body">
 
-    <!-- Member search — tabs: ID or Name -->
+    <!-- Member search: by ID or by Name -->
     <div class="c">
-      <!-- Tab switcher -->
       <div class="dup-search-tabs">
-        <button class="dup-tab active" id="tab-id"   onclick="setDupTab('id')">🔢 Member ID</button>
-        <button class="dup-tab"        id="tab-name" onclick="setDupTab('name')">🔤 Name Search</button>
+        <button class="dup-tab active" id="dup-tab-id"   onclick="setDupTab('id')">🔢 Member ID</button>
+        <button class="dup-tab"        id="dup-tab-name" onclick="setDupTab('name')">🔤 Name Search</button>
       </div>
 
-      <!-- Tab: Member ID -->
+      <!-- ID panel -->
       <div id="dup-id-panel">
         <div class="scan-row">
           <input class="scan-input" type="text" id="dup-mi"
-            placeholder="Enter member ID e.g. A1, N106"
+            placeholder="Scan or type member ID → Enter"
             autocomplete="off" autocorrect="off" autocapitalize="none"
             spellcheck="false" inputmode="text"
-            onkeydown="onDupMK(event)">
+            onkeydown="onDupMK(event)" oninput="onDupMI()">
           <button class="btn-clear" onclick="resetDupSlip()">✕</button>
         </div>
       </div>
 
-      <!-- Tab: Name fuzzy search -->
+      <!-- Name panel -->
       <div id="dup-name-panel" style="display:none;">
         <div class="fuzzy-wrap">
           <input class="fuzzy-input" type="text" id="dup-name-input"
-            placeholder="Type name to search…"
+            placeholder="Type member name to search…"
             autocomplete="off" autocorrect="off" spellcheck="false"
             oninput="onDupNameInput()"
             onblur="hideFuzzyList()">
-          <div class="fuzzy-list" id="fuzzy-list"></div>
+          <div class="fuzzy-list" id="dup-fuzzy-list"></div>
         </div>
       </div>
 
       <div class="mresult" id="dup-mr"></div>
     </div>
 
-    <!-- Remarks -->
-    <div class="c" id="dup-remarks-card" style="display:none;">
-      <label class="clabel">Remarks (optional)</label>
-      <textarea class="dup-remarks" id="dup-remarks" placeholder="Enter any remarks…"></textarea>
+    <!-- Marksheet (M flag only) -->
+    <div class="ms-row" id="dup-msr">
+      <div class="ms-left">
+        <span class="ms-title">📄 Marksheet</span>
+        <span class="ms-sub">Check if marksheet submitted (₹0)</span>
+      </div>
+      <div class="ms-cb-wrap">
+        <input class="ms-cb" type="checkbox" id="dup-mscb" onchange="dupUpdateAmount()">
+      </div>
     </div>
 
-    <!-- QR Code preview -->
-    <div class="qr-canvas-wrap" id="dup-qr-wrap" style="display:none;">
-      <label class="clabel" style="align-self:flex-start;">QR Code</label>
-      <canvas id="dup-qr-canvas" width="160" height="160"></canvas>
-      <div class="qr-string" id="dup-qr-string"></div>
+    <!-- Qty + Method -->
+    <div class="controls-row">
+      <div class="c qty-card">
+        <label class="clabel">Quantity</label>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="dupChangeQty(-1)">−</button>
+          <div class="qty-val" id="dup-qval">30</div>
+          <button class="qty-btn" onclick="dupChangeQty(1)">+</button>
+        </div>
+      </div>
+      <div class="c method-card">
+        <label class="clabel">Entry Method</label>
+        <div class="method-toggle" onclick="dupToggleMethod()">
+          <div class="mt-pill qr" id="dup-mpill"></div>
+          <div class="mt-opt active" id="dup-mopt-qr">📷 QR<br>Scan</div>
+          <div class="mt-opt"       id="dup-mopt-man">✏️ Manual<br>Entry</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Print button -->
-    <button class="btn-dup-print" id="btn-dup-print" style="display:none;" onclick="printDupSlip()">
-      🖨️ PRINT DUPLICATE SLIP
+    <!-- Amount -->
+    <div class="amount-bar">
+      <div>
+        <div class="amt-label">Amount</div>
+        <div class="amt-val" id="dup-aval">₹0</div>
+        <div class="amt-note" id="dup-anote"></div>
+      </div>
+      <div style="font-size:26px;opacity:0.25;">💰</div>
+    </div>
+
+    <!-- Comment field (user input, saved to comment column) -->
+    <div class="c" style="flex-shrink:0;padding:10px 12px;">
+      <label class="clabel">Comment (optional)</label>
+      <input type="text" id="dup-comment"
+        placeholder="Enter any comment…"
+        autocomplete="off" spellcheck="false"
+        class="scan-input" style="font-size:14px;padding:10px 12px;">
+    </div>
+
+    <!-- Submit -->
+    <button class="btn-submit" id="dup-bsub" onclick="dupSubmit()"
+      style="background:var(--purple);box-shadow:0 4px 14px rgba(124,58,237,0.35);">
+      🔖 SUBMIT DUPLICATE SLIP
     </button>
+
+    <!-- Last entry strip -->
+    <div class="last-entry" id="dup-last-entry">
+      <div class="le-label">✅ Last Dup Slip</div>
+      <div class="le-row">
+        <span class="le-id"   id="dup-le-id"></span>
+        <span class="le-mid"  id="dup-le-mid"></span>
+        <span class="le-name" id="dup-le-name"></span>
+        <span class="le-qty"  id="dup-le-qty"></span>
+        <span class="le-amt"  id="dup-le-amt"></span>
+      </div>
+    </div>
 
   </div>
 </div>
