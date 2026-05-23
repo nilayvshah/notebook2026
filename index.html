@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SZVS Jain Samaj</title>
-<meta name="app-version" content="20260523-0944">
+<meta name="app-version" content="20260523-0943">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
 /* QR Code generator — inline, no CDN, global scope */
@@ -1067,12 +1067,10 @@ function onMK(e){
   e.preventDefault();
   const raw=document.getElementById('mi').value.trim();
   if(!raw) return;
-  const v=decodeQR(raw); // decode QR format → real member ID
-  if(v !== raw) {
-    // Update input field to show decoded ID
-    document.getElementById('mi').value = v;
-  }
-  lookupMember(v);
+  const v=decodeQR(raw);
+  if(v !== raw) document.getElementById('mi').value = v;
+  // Use cameraLookupEntry — proven to work same as dupLookupMember
+  cameraLookupEntry(v);
 }
 
 // ════════════════════════════════════════════════════
@@ -1642,112 +1640,105 @@ function closePrintDialog(){
 function buildEscPos(data){
   const enc = new TextEncoder();
   const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
-  const INIT         = [ESC,0x40];
-  const ALIGN_CENTER = [ESC,0x61,0x01];
-  const ALIGN_LEFT   = [ESC,0x61,0x00];
-  const BOLD_ON      = [ESC,0x45,0x01];
-  const BOLD_OFF     = [ESC,0x45,0x00];
-  const BIG          = [ESC,0x21,0x30]; // double width+height
-  const NORMAL       = [ESC,0x21,0x00];
-  const CUT          = [GS,0x56,0x41,0x10];
-
-  function txt(s){ return Array.from(enc.encode(String(s||''))); }
-  function line(s=''){ return [...txt(s),LF]; }
-  function sep(){ return line('--------------------------------'); }
-  // Bold label + plain value as ONE combined line — avoids BLE chunk boundary issues
-  function row(label, val){
-    return [...BOLD_ON, ...txt(label), ...BOLD_OFF, ...txt(String(val||'')), LF];
-  }
-  // Optional row — only printed if value is truthy and not 'No'
-  function optRow(label, val){
-    const v = String(val||'').trim();
-    if(!v || v.toLowerCase()==='no') return [];
-    return row(label, v);
-  }
-  // Word-wrap helper for long values
-  function wrapLine(label, val, maxLen=22){
-    const v = String(val||'').trim();
-    if(!v) return [];
-    const words = v.split(' ');
-    const lines = []; let cur='';
-    for(const w of words){
-      if((cur+' '+w).trim().length > maxLen){ if(cur) lines.push(cur.trim()); cur=w; }
-      else cur=(cur+' '+w).trim();
-    }
-    if(cur) lines.push(cur.trim());
-    const bytes = [...BOLD_ON,...txt(label),...BOLD_OFF,...txt(lines[0]),LF];
-    const pad = ' '.repeat(label.length);
-    for(let i=1;i<lines.length;i++) bytes.push(...txt(pad+lines[i]),LF);
-    return bytes;
-  }
 
   // Safe field accessors
-  const entryId  = data.entry_id   || '';
-  const memberId = data.member_id  || data.memberid    || '';
-  const name     = data.name       || data.member_name || '';
-  const mobile   = data.mobile     || '';
-  const qty      = data.qty        || '';
-  const amount   = data.amount     || 0;
-  const marksheet= data.marksheet  || 'No';
-  const remark   = data.remark     || '';
-  const comment  = data.comment    || '';
-  const userid   = data.userid     || data.logged_by   || cUser || '';
-  const username = data.username   || cName             || userid;
+  const entryId  = String(data.entry_id  || '');
+  const memberId = String(data.member_id || data.memberid    || '');
+  const name     = String(data.name      || data.member_name || '');
+  const mobile   = String(data.mobile    || '');
+  const qty      = String(data.qty       || '');
+  const amount   = String(data.amount    || '0');
+  const marksheet= String(data.marksheet || 'No');
+  const remark   = String(data.remark    || '');
+  const comment  = String(data.comment   || '');
+  const userid   = String(data.userid    || data.logged_by || cUser || '');
+  const username = String(data.username  || cName || userid);
   const dt = data.timestamp
     ? new Date(data.timestamp).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
     : new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
 
-  const bytes = [
-    ...INIT,
-    // ── Header ──
-    ...ALIGN_CENTER,
-    ...BOLD_ON,...BIG,...line('SZVS JAIN SAMAJ'),...NORMAL,...BOLD_OFF,
-    ...line('Member Entry Receipt'),
-    ...sep(),
-    // ── Member details ──
-    ...ALIGN_LEFT,
-    ...row('Entry ID  : ', entryId),
-    ...row('Member ID : ', memberId),
-    ...wrapLine('Name      : ', name),
-    ...optRow ('Mobile    : ', mobile),
-    ...line(''),
-    // ── Transaction details ──
-    ...row('Quantity  : ', qty),
-    ...row('Amt Paid  : ', 'Rs. '+amount),
-  ];
+  // Build byte array from a plain string with ESC/POS inline commands
+  // Each call to p() appends to the result
+  const buf = [];
+  const e = s => buf.push(...Array.from(enc.encode(s)));
+  const b = ()=> buf.push(ESC,0x45,0x01);  // bold on
+  const nb= ()=> buf.push(ESC,0x45,0x00);  // bold off
+  const lf= ()=> buf.push(LF);             // newline
+  const ac= ()=> buf.push(ESC,0x61,0x01);  // align center
+  const al= ()=> buf.push(ESC,0x61,0x00);  // align left
+  const sep=()=>{ e('--------------------------------'); lf(); };
+  const nl= ()=>{ lf(); };                 // blank line
 
-  // Optional fields
-  if(marksheet==='Yes'){
-    bytes.push(...row('Marksheet : ', 'Given'));
-  }
-  // remark — skip if it's just "Duplicate Slip" alone (already implied by form)
-  const remarkClean = String(remark||'').trim();
-  if(remarkClean){ bytes.push(...optRow('Remark    : ', remarkClean)); }
-  const commentClean = String(comment||'').trim();
-  if(commentClean){ bytes.push(...optRow('Comment   : ', commentClean)); }
+  // row: bold label + normal value + newline
+  const row=(label,val)=>{
+    if(!val || val.trim()==='') return;
+    b(); e(label); nb(); e(val); lf();
+  };
+  // optional row — skip if empty or 'No'
+  const opt=(label,val)=>{
+    const v=(val||'').trim();
+    if(!v || v.toLowerCase()==='no') return;
+    row(label,v);
+  };
+  // word-wrapped row
+  const wrap=(label,val,maxLen=22)=>{
+    const v=(val||'').trim(); if(!v) return;
+    const words=v.split(' '); const lines=[]; let cur='';
+    for(const w of words){
+      if((cur+' '+w).trim().length>maxLen){ if(cur)lines.push(cur.trim()); cur=w; }
+      else cur=(cur+' '+w).trim();
+    }
+    if(cur)lines.push(cur.trim());
+    b(); e(label); nb(); e(lines[0]); lf();
+    const pad=' '.repeat(label.length);
+    for(let i=1;i<lines.length;i++){ e(pad+lines[i]); lf(); }
+  };
 
-  bytes.push(
-    ...sep(),
-    ...ALIGN_CENTER,
-    ...line('Please issue above qty.'),
-    ...line(''),
-    ...ALIGN_LEFT,
-    ...row('Issued By : ', String(username)+' ('+String(userid)+')'),
-    ...line(''),
-    // Print date & time
-    ...row('Date/Time : ', dt),
-    ...sep(),
-    // 4 blank lines for physical stamp
-    ...line(''),...line(''),...line(''),...line(''),
-    ...ALIGN_CENTER,
-    ...row('', 'Sign / Stamp'),
-    ...sep(),
-    // Feed lines before cut
-    ...line(''),...line(''),...line(''),
-    ...CUT,
-  );
+  // ── Build receipt ──
+  buf.push(ESC,0x40);   // init
 
-  return new Uint8Array(bytes);
+  // Header
+  ac();
+  b(); buf.push(ESC,0x21,0x10); e('SZVS JAIN SAMAJ'); buf.push(ESC,0x21,0x00); nb(); lf();
+  e('Member Entry Receipt'); lf();
+  sep();
+
+  // Member details
+  al();
+  row('Entry ID  : ', entryId);
+  row('Member ID : ', memberId);
+  wrap('Name      : ', name);
+  opt('Mobile    : ', mobile);
+  nl();
+
+  // Transaction
+  row('Quantity  : ', qty);
+  row('Amt Paid  : ', 'Rs. '+amount);
+  opt('Marksheet : ', marksheet==='Yes'?'Given':'');
+  opt('Remark    : ', remark);
+  opt('Comment   : ', comment);
+  sep();
+
+  // Footer
+  ac();
+  e('Please issue above qty.'); lf();
+  nl();
+  al();
+  row('Issued By : ', username+' ('+userid+')');
+  row('Date/Time : ', dt);
+  sep();
+
+  // Stamp area
+  nl(); nl(); nl(); nl();
+  ac();
+  b(); e('Sign / Stamp'); nb(); lf();
+  sep();
+
+  // Paper feed + cut
+  nl(); nl(); nl();
+  buf.push(GS,0x56,0x41,0x10);
+
+  return new Uint8Array(buf);
 }
 
 // ── Connect to BT printer and print ──
