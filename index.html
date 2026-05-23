@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>SZVS Jain Samaj</title>
+<title>1SZVS Jain Samaj</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
 /* QR Code generator — inline, no CDN, global scope */
@@ -2135,8 +2135,26 @@ async function dupSubmit(){
       document.getElementById('dup-le-amt').textContent  = ms==='Yes'?'₹0 📄':'₹'+d.amount;
       document.getElementById('dup-last-entry').classList.add('show');
       showToast(`✅ Dup Slip #${eid} saved — ₹${d.amount}`, 'success', 5000);
-      // Re-enable button immediately so it's ready for next entry
       btn.disabled=false; btn.innerHTML='🔖 SUBMIT DUPLICATE SLIP';
+
+      // Always show print dialog for Dup Slip (every time)
+      const dupComment = (document.getElementById('dup-comment').value||'').trim();
+      showPrintDialog({
+        entry_id:    eid,
+        member_id:   dupFound.memberid,
+        name:        dupFound.name,
+        mobile:      dupFound.mobile   || '',
+        qty:         dupGetQty(),
+        amount:      d.amount,
+        marksheet:   ms,
+        entry_method:dupMethod,
+        remark:      'Duplicate Slip',
+        comment:     dupComment,
+        userid:      cUser,
+        username:    cName,
+        timestamp:   d.timestamp,
+      });
+
       // Reset form fields but keep last entry strip
       dupFound=null;
       const mi=document.getElementById('dup-mi');
@@ -2148,7 +2166,6 @@ async function dupSubmit(){
       document.getElementById('dup-mscb').checked=false;
       dupQIdx=2; document.getElementById('dup-qval').textContent='30';
       dupMethod='qrcode'; dupRenderMethod(); dupUpdateAmount();
-      // Focus dup slip input (not main entry input)
       setTimeout(()=>{ const e=document.getElementById('dup-mi'); if(e){ e.setAttribute('readonly','readonly'); e.focus(); setTimeout(()=>e.removeAttribute('readonly'),500); }},150);
     } else {
       showToast('❌ '+(d.error||'Error'),'error');
