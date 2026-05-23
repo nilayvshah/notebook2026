@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SZVS Jain Samaj</title>
-<meta name="app-version" content="20260523-0956">
+<meta name="app-version" content="20260523-0943">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
 /* QR Code generator — inline, no CDN, global scope */
@@ -1004,20 +1004,14 @@ function initEntry(){
 let kbOpen = false;
 
 function focusMI(suppressKeyboard=false){
+  // Always restore inputmode to text and focus normally
+  // Keyboard suppression handled via blur() in cameraLookupEntry/dupLookupMember instead
   setTimeout(()=>{
     const e=document.getElementById('mi');
     if(!e) return;
-    if(suppressKeyboard){
-      // Use inputmode="none" to suppress soft keyboard
-      // IMPORTANT: do NOT use readonly — it blocks keydown events from Zebra scanner
-      e.setAttribute('inputmode','none');
-      e.focus();
-      setKbState(false);
-    } else {
-      e.setAttribute('inputmode','text');
-      e.focus();
-      setKbState(true);
-    }
+    e.setAttribute('inputmode','text');
+    e.focus();
+    setKbState(true);
   }, 150);
 }
 
@@ -1275,6 +1269,9 @@ async function doSubmit(){
           timestamp:    d.timestamp,
         });
       }
+      // CRITICAL: reset input state so next scan triggers keydown properly
+      const _mi=document.getElementById('mi');
+      if(_mi){ _mi.setAttribute('inputmode','text'); _mi.removeAttribute('readonly'); }
       resetForm(false);
     } else {
       showToast('❌ '+(d.error||'Error'),'error');
@@ -1715,17 +1712,23 @@ async function doPrint(){
   statusEl.textContent = 'Searching for printer…';
 
   try{
-    // If already paired, reuse connection
+    // If already paired in session, reuse connection
     if(!btCharacteristic){
-      statusEl.textContent = 'Select your printer…';
+      statusEl.textContent = 'Looking for HQ300_6F8C…';
+
+      // Try to reconnect to previously paired device (same session only —
+      // browser security requires user gesture for cross-session reconnect)
       btDevice = await navigator.bluetooth.requestDevice({
-        // Accept any BT device — user picks their printer from system dialog
-        acceptAllDevices: true,
+        // Filter shows ONLY printers matching this name prefix
+        // User sees just "HQ300_6F8C" in the dialog, taps once → connected
+        filters: [
+          { namePrefix: 'HQ300' },
+        ],
         optionalServices: [
-          '000018f0-0000-1000-8000-00805f9b34fb',  // Generic BT printer service
-          '00001101-0000-1000-8000-00805f9b34fb',  // SPP (Serial Port Profile)
-          'e7810a71-73ae-499d-8c15-faa9aef0c3f2',  // Common ESC/POS BLE service
-          '49535343-fe7d-4ae5-8fa9-9fafd205e455',  // Another common ESC/POS
+          '000018f0-0000-1000-8000-00805f9b34fb',
+          '00001101-0000-1000-8000-00805f9b34fb',
+          'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+          '49535343-fe7d-4ae5-8fa9-9fafd205e455',
         ],
       });
 
@@ -2179,12 +2182,15 @@ async function dupSubmit(){
 //  keyboard/focus complexity of lookupMember
 // ════════════════════════════════════════════════════
 function cameraLookupEntry(memberId){
-  // Ensure entry page is active (camera overlay may have obscured it)
+  // Ensure entry page is active and input is ready for keyboard events
   showPage('entry');
 
   const mr = document.getElementById('mr');
   const mi = document.getElementById('mi');
   if(!mr || !mi){ showToast('⚠️ UI error: elements not found','error'); return; }
+  // CRITICAL: restore inputmode to ensure keydown events fire on next scan
+  mi.setAttribute('inputmode','text');
+  mi.removeAttribute('readonly');
 
   // Reset state
   found = null; isDup = false;
