@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Manav Rahat</title>
+<title>SZVS Jain Samaj</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
 /* QR Code generator — inline, no CDN, global scope */
@@ -430,7 +430,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
 <div class="page active" id="page-login">
   <div class="login-logo">
     <div class="login-icon">🤝</div>
-    <div class="login-title">Manav Rahat</div>
+    <div class="login-title">SZVS Jain Samaj</div>
     <div class="login-sub">Member Entry System</div>
   </div>
   <div class="login-card">
@@ -451,7 +451,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
 <div class="page" id="page-entry">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="topbar-title">🤝 Manav Rahat <span class="admin-badge" id="admin-badge" style="display:none;">ADMIN</span></div>
+      <div class="topbar-title">🤝 SZVS Jain Samaj <span class="admin-badge" id="admin-badge" style="display:none;">ADMIN</span></div>
       <div class="topbar-user" id="ulab"></div>
     </div>
     <div class="topbar-btns" id="topbar-btns"></div>
@@ -1224,10 +1224,13 @@ async function doSubmit(){
           entry_id:     eid,
           member_id:    savedMember.memberid,
           name:         savedMember.name,
+          mobile:       savedMember.mobile   || '',
           qty:          getQty(),
           amount:       d.amount,
           marksheet:    ms,
           entry_method: method,
+          remark:       '',
+          comment:      '',
           userid:       cUser,
           username:     cName,
           timestamp:    d.timestamp,
@@ -1597,82 +1600,107 @@ function closePrintDialog(){
 // ── Build ESC/POS byte array for 2.5 inch (58mm) paper ──
 function buildEscPos(data){
   const enc = new TextEncoder();
+  const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
+  const INIT         = [ESC,0x40];
+  const ALIGN_CENTER = [ESC,0x61,0x01];
+  const ALIGN_LEFT   = [ESC,0x61,0x00];
+  const BOLD_ON      = [ESC,0x45,0x01];
+  const BOLD_OFF     = [ESC,0x45,0x00];
+  const BIG          = [ESC,0x21,0x30]; // double width+height
+  const NORMAL       = [ESC,0x21,0x00];
+  const CUT          = [GS,0x56,0x41,0x10];
 
-  // ESC/POS command helpers
-  const ESC  = 0x1B;
-  const GS   = 0x1D;
-  const LF   = 0x0A;
-  const INIT          = [ESC, 0x40];              // Initialize printer
-  const ALIGN_CENTER  = [ESC, 0x61, 0x01];        // Center align
-  const ALIGN_LEFT    = [ESC, 0x61, 0x00];        // Left align
-  const BOLD_ON       = [ESC, 0x45, 0x01];        // Bold on
-  const BOLD_OFF      = [ESC, 0x45, 0x00];        // Bold off
-  const DOUBLE_HEIGHT = [ESC, 0x21, 0x10];        // Double height text
-  const NORMAL_SIZE   = [ESC, 0x21, 0x00];        // Normal text size
-  const CUT           = [GS,  0x56, 0x41, 0x10];  // Partial cut
+  function txt(s){ return Array.from(enc.encode(String(s||''))); }
+  function line(s=''){ return [...txt(s),LF]; }
+  function sep(){ return line('--------------------------------'); }
+  // Optional row — only printed if value is truthy
+  function optRow(label,val){
+    const v = String(val||'').trim();
+    if(!v || v==='No' || v==='no') return [];
+    return [...BOLD_ON,...txt(label),...BOLD_OFF,...line(v)];
+  }
+  // Word-wrap for long text (name, address etc) — 32 chars per line
+  function wrapLine(label, val, maxLen=22){
+    const v = String(val||'').trim();
+    if(!v) return [];
+    const words = v.split(' ');
+    const lines = [];
+    let cur = '';
+    for(const w of words){
+      if((cur+' '+w).trim().length > maxLen){ if(cur) lines.push(cur.trim()); cur=w; }
+      else cur=(cur+' '+w).trim();
+    }
+    if(cur) lines.push(cur.trim());
+    const bytes = [...BOLD_ON,...txt(label),...BOLD_OFF,...txt(lines[0]),LF];
+    const pad   = ' '.repeat(label.length);
+    for(let i=1;i<lines.length;i++) bytes.push(...txt(pad+lines[i]),LF);
+    return bytes;
+  }
 
-  function txt(s){ return Array.from(enc.encode(s)); }
-  function line(s=''){ return [...txt(s), LF]; }
-  function separator(){ return line('--------------------------------'); }
-
+  // Safe field accessors
+  const entryId  = data.entry_id   || '';
+  const memberId = data.member_id  || data.memberid    || '';
+  const name     = data.name       || data.member_name || '';
+  const mobile   = data.mobile     || '';
+  const qty      = data.qty        || '';
+  const amount   = data.amount     || 0;
+  const marksheet= data.marksheet  || 'No';
+  const remark   = data.remark     || '';
+  const comment  = data.comment    || '';
+  const userid   = data.userid     || data.logged_by   || cUser || '';
+  const username = data.username   || cName             || userid;
   const dt = data.timestamp
     ? new Date(data.timestamp).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
     : new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
 
-  // Safe accessors — handle both field name variants
-  const entryId  = data.entry_id  || data.entry_id  || '';
-  const memberId = data.member_id || data.memberid   || '';
-  const name     = data.name      || data.member_name|| '';
-  const qty      = data.qty       || '';
-  const amount   = data.amount    || 0;
-  const marksheet= data.marksheet || 'No';
-  const userid   = data.userid    || data.logged_by  || cUser || '';
-  const username = data.username  || data.name       || cName || userid;
-
   const bytes = [
     ...INIT,
+    // ── Header ──
     ...ALIGN_CENTER,
-    ...BOLD_ON,
-    ...DOUBLE_HEIGHT,
-    ...line('MANAV RAHAT'),
-    ...NORMAL_SIZE,
-    ...BOLD_OFF,
+    ...BOLD_ON,...BIG,...line('SZVS JAIN SAMAJ'),...NORMAL,...BOLD_OFF,
     ...line('Member Entry Receipt'),
-    ...separator(),
+    ...sep(),
+    // ── Member details ──
     ...ALIGN_LEFT,
-    ...BOLD_ON,  ...txt('Entry ID  : '), ...BOLD_OFF, ...line(String(entryId)),
-    ...BOLD_ON,  ...txt('Member ID : '), ...BOLD_OFF, ...line(String(memberId)),
-    ...BOLD_ON,  ...txt('Name      : '), ...BOLD_OFF, ...line(String(name)),
+    ...BOLD_ON,...txt('Entry ID  : '),...BOLD_OFF,...line(String(entryId)),
+    ...BOLD_ON,...txt('Member ID : '),...BOLD_OFF,...line(String(memberId)),
+    ...wrapLine('Name      : ', name),
+    ...optRow ('Mobile    : ', mobile),
     ...line(''),
-    ...BOLD_ON,  ...txt('Quantity  : '), ...BOLD_OFF, ...line(String(qty)),
-    ...BOLD_ON,  ...txt('Amt Paid  : '), ...BOLD_OFF, ...line('Rs. ' + amount),
+    // ── Transaction details ──
+    ...BOLD_ON,...txt('Quantity  : '),...BOLD_OFF,...line(String(qty)),
+    ...BOLD_ON,...txt('Amt Paid  : '),...BOLD_OFF,...line('Rs. '+amount),
   ];
 
-  // Marksheet line only if submitted
-  if(marksheet === 'Yes'){
-    bytes.push(...BOLD_ON, ...line('** Marksheet Submitted **'), ...BOLD_OFF);
+  // Optional fields
+  if(marksheet==='Yes'){
+    bytes.push(...BOLD_ON,...line('Marksheet : Given'),...BOLD_OFF);
   }
+  // remark — skip if it's just "Duplicate Slip" alone (already implied by form)
+  const remarkClean = String(remark||'').trim();
+  if(remarkClean){ bytes.push(...optRow('Remark    : ', remarkClean)); }
+  const commentClean = String(comment||'').trim();
+  if(commentClean){ bytes.push(...optRow('Comment   : ', commentClean)); }
 
   bytes.push(
-    ...separator(),
+    ...sep(),
     ...ALIGN_CENTER,
     ...line('Please issue above qty.'),
     ...line(''),
-    ...BOLD_ON,
     ...ALIGN_LEFT,
-    ...txt('Issued By : '), ...BOLD_OFF,
-    ...line(String(username) + ' (' + String(userid) + ')'),
+    ...BOLD_ON,...txt('Issued By : '),...BOLD_OFF,
+    ...line(String(username)+' ('+String(userid)+')'),
     ...line(''),
-    ...line(dt),
-    ...separator(),
-    // 4 blank lines for physical stamp space
-    ...line(''), ...line(''), ...line(''), ...line(''),
+    // Print date & time
+    ...BOLD_ON,...txt('Date/Time : '),...BOLD_OFF,...line(dt),
+    ...sep(),
+    // 4 blank lines for physical stamp
+    ...line(''),...line(''),...line(''),...line(''),
     ...ALIGN_CENTER,
-    ...BOLD_ON,
-    ...line('Sign / Stamp'),
-    ...BOLD_OFF,
-    ...separator(),
-    ...line(''), ...line(''), ...line(''),   // feed before cut
+    ...BOLD_ON,...line('Sign / Stamp'),...BOLD_OFF,
+    ...sep(),
+    // Feed lines before cut
+    ...line(''),...line(''),...line(''),
     ...CUT,
   );
 
