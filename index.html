@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>1SZVS Jain Samaj</title>
+<title>SZVS Jain Samaj</title>
+<meta name="app-version" content="20260523-0943">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
 /* QR Code generator — inline, no CDN, global scope */
@@ -227,6 +228,24 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
 @keyframes fadeIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
 @keyframes spin{to{transform:rotate(360deg);}}
 
+/* ── HARD REFRESH BUTTON ── */
+.btn-refresh-hard{
+  position:fixed; bottom:14px; right:14px;
+  width:38px; height:38px; border-radius:50%;
+  background:rgba(255,255,255,0.15);
+  border:1.5px solid rgba(255,255,255,0.25);
+  color:rgba(255,255,255,0.6); font-size:15px;
+  cursor:pointer; display:flex; align-items:center;
+  justify-content:center; z-index:500;
+  transition:all 0.2s; -webkit-appearance:none;
+}
+.btn-refresh-hard:active{ background:rgba(255,255,255,0.3); transform:rotate(180deg); }
+.btn-refresh-hard.dark{
+  background:rgba(15,31,61,0.08);
+  border-color:var(--border); color:var(--muted);
+}
+.btn-refresh-hard.dark:active{ background:var(--border); }
+
 /* ── CAMERA SCANNER ── */
 .cam-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,0.92);
@@ -442,7 +461,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14
            autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn-login" id="blg" onclick="doLogin()">LOGIN</button>
     <div class="login-err" id="lerr"></div>
+    <div style="text-align:center;margin-top:14px;">
+      <span style="font-size:10px;color:rgba(255,255,255,0.25);font-family:var(--mono);" id="ver-login"></span>
+    </div>
   </div>
+  <!-- Hard refresh button — bottom right -->
+  <button class="btn-refresh-hard" onclick="hardRefresh()" title="Force reload latest version">↺</button>
 </div>
 
 <!-- ════════════════════════════════
@@ -930,6 +954,23 @@ async function doLogin(){
 }
 function setLT(t){ document.getElementById('ltxt').textContent=t; }
 
+// Hard refresh — bypasses all browser cache
+function hardRefresh(){
+  // Add timestamp param to URL to force fresh fetch from server
+  const url = window.location.href.split('?')[0] + '?v=' + Date.now();
+  window.location.replace(url);
+}
+
+// Show version on login page
+function showVersion(){
+  const el = document.getElementById('ver-login');
+  if(el){
+    const meta = document.querySelector('meta[name="app-version"]');
+    const ver  = meta ? meta.content : 'unknown';
+    el.textContent = 'v' + ver;
+  }
+}
+
 function doLogout(){
   sessionStorage.clear(); mmap={}; cUser=cName=null; isAdmin=false; nxtId=null;
   document.getElementById('lu').value='';
@@ -951,10 +992,12 @@ function initEntry(){
        <button class="tbtn admin" onclick="goReport2()">👥 All</button>
        <button class="tbtn admin" onclick="goReport3()">📊 Summary</button>
        <button class="tbtn" style="background:rgba(124,58,237,0.25);color:#c4b5fd;" onclick="goDupSlip()">🔖 Dup</button>
-       <button class="tbtn" onclick="doLogout()">Exit</button>`
+       <button class="tbtn" onclick="doLogout()">Exit</button>
+       <button class="tbtn" onclick="hardRefresh()" title="Force reload latest version" style="font-size:14px;padding:5px 8px;">↺</button>`
     : `<button class="tbtn" onclick="goReport1()">📊 Report</button>
        <button class="tbtn" style="background:rgba(124,58,237,0.25);color:#c4b5fd;" onclick="goDupSlip()">🔖 Dup</button>
-       <button class="tbtn" onclick="doLogout()">Exit</button>`;
+       <button class="tbtn" onclick="doLogout()">Exit</button>
+       <button class="tbtn" onclick="hardRefresh()" title="Force reload latest version" style="font-size:14px;padding:5px 8px;">↺</button>`;
   resetForm();
 }
 // Track keyboard state
@@ -2423,6 +2466,7 @@ function onCodeDetected(raw){
 //  START — called after all functions are defined above
 // ════════════════════════════════════════════════════
 (function init(){
+  showVersion(); // show build version on login page
   const u=sessionStorage.getItem('lu');
   const p=sessionStorage.getItem('lp');
   if(u && p){
