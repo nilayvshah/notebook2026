@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SZVS Jain Samaj</title>
-<meta name="app-version" content="20260523-0943">
+<meta name="app-version" content="20260523-0944">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
 /* QR Code generator — inline, no CDN, global scope */
@@ -1008,14 +1008,13 @@ function focusMI(suppressKeyboard=false){
     const e=document.getElementById('mi');
     if(!e) return;
     if(suppressKeyboard){
-      // readonly trick: focus without opening soft keyboard
-      // Zebra hardware scanner still fires into the focused field
-      e.setAttribute('readonly','readonly');
+      // Use inputmode="none" to suppress soft keyboard
+      // IMPORTANT: do NOT use readonly — it blocks keydown events from Zebra scanner
+      e.setAttribute('inputmode','none');
       e.focus();
-      setTimeout(()=>{ e.removeAttribute('readonly'); }, 500);
       setKbState(false);
     } else {
-      e.removeAttribute('readonly');
+      e.setAttribute('inputmode','text');
       e.focus();
       setKbState(true);
     }
@@ -1027,14 +1026,13 @@ function toggleKeyboard(){
   const mi = document.getElementById('mi');
   if(!mi) return;
   if(kbOpen){
-    // Close keyboard — set readonly and blur
-    mi.setAttribute('readonly','readonly');
-    mi.blur();
-    setTimeout(()=>{ mi.focus(); }, 100); // refocus for scanner without keyboard
+    // Close keyboard — inputmode=none (NOT readonly — readonly blocks scanner keydown events)
+    mi.setAttribute('inputmode','none');
+    mi.focus();
     setKbState(false);
   } else {
-    // Open keyboard — remove readonly and focus
-    mi.removeAttribute('readonly');
+    // Open keyboard — restore inputmode=text
+    mi.setAttribute('inputmode','text');
     mi.focus();
     setKbState(true);
   }
@@ -1656,26 +1654,29 @@ function buildEscPos(data){
   function txt(s){ return Array.from(enc.encode(String(s||''))); }
   function line(s=''){ return [...txt(s),LF]; }
   function sep(){ return line('--------------------------------'); }
-  // Optional row — only printed if value is truthy
-  function optRow(label,val){
-    const v = String(val||'').trim();
-    if(!v || v==='No' || v==='no') return [];
-    return [...BOLD_ON,...txt(label),...BOLD_OFF,...line(v)];
+  // Bold label + plain value as ONE combined line — avoids BLE chunk boundary issues
+  function row(label, val){
+    return [...BOLD_ON, ...txt(label), ...BOLD_OFF, ...txt(String(val||'')), LF];
   }
-  // Word-wrap for long text (name, address etc) — 32 chars per line
+  // Optional row — only printed if value is truthy and not 'No'
+  function optRow(label, val){
+    const v = String(val||'').trim();
+    if(!v || v.toLowerCase()==='no') return [];
+    return row(label, v);
+  }
+  // Word-wrap helper for long values
   function wrapLine(label, val, maxLen=22){
     const v = String(val||'').trim();
     if(!v) return [];
     const words = v.split(' ');
-    const lines = [];
-    let cur = '';
+    const lines = []; let cur='';
     for(const w of words){
       if((cur+' '+w).trim().length > maxLen){ if(cur) lines.push(cur.trim()); cur=w; }
       else cur=(cur+' '+w).trim();
     }
     if(cur) lines.push(cur.trim());
     const bytes = [...BOLD_ON,...txt(label),...BOLD_OFF,...txt(lines[0]),LF];
-    const pad   = ' '.repeat(label.length);
+    const pad = ' '.repeat(label.length);
     for(let i=1;i<lines.length;i++) bytes.push(...txt(pad+lines[i]),LF);
     return bytes;
   }
@@ -1705,19 +1706,19 @@ function buildEscPos(data){
     ...sep(),
     // ── Member details ──
     ...ALIGN_LEFT,
-    ...BOLD_ON,...txt('Entry ID  : '),...BOLD_OFF,...line(String(entryId)),
-    ...BOLD_ON,...txt('Member ID : '),...BOLD_OFF,...line(String(memberId)),
+    ...row('Entry ID  : ', entryId),
+    ...row('Member ID : ', memberId),
     ...wrapLine('Name      : ', name),
     ...optRow ('Mobile    : ', mobile),
     ...line(''),
     // ── Transaction details ──
-    ...BOLD_ON,...txt('Quantity  : '),...BOLD_OFF,...line(String(qty)),
-    ...BOLD_ON,...txt('Amt Paid  : '),...BOLD_OFF,...line('Rs. '+amount),
+    ...row('Quantity  : ', qty),
+    ...row('Amt Paid  : ', 'Rs. '+amount),
   ];
 
   // Optional fields
   if(marksheet==='Yes'){
-    bytes.push(...BOLD_ON,...line('Marksheet : Given'),...BOLD_OFF);
+    bytes.push(...row('Marksheet : ', 'Given'));
   }
   // remark — skip if it's just "Duplicate Slip" alone (already implied by form)
   const remarkClean = String(remark||'').trim();
@@ -1731,16 +1732,15 @@ function buildEscPos(data){
     ...line('Please issue above qty.'),
     ...line(''),
     ...ALIGN_LEFT,
-    ...BOLD_ON,...txt('Issued By : '),...BOLD_OFF,
-    ...line(String(username)+' ('+String(userid)+')'),
+    ...row('Issued By : ', String(username)+' ('+String(userid)+')'),
     ...line(''),
     // Print date & time
-    ...BOLD_ON,...txt('Date/Time : '),...BOLD_OFF,...line(dt),
+    ...row('Date/Time : ', dt),
     ...sep(),
     // 4 blank lines for physical stamp
     ...line(''),...line(''),...line(''),...line(''),
     ...ALIGN_CENTER,
-    ...BOLD_ON,...line('Sign / Stamp'),...BOLD_OFF,
+    ...row('', 'Sign / Stamp'),
     ...sep(),
     // Feed lines before cut
     ...line(''),...line(''),...line(''),
