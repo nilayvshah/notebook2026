@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SZVS Jain Samaj</title>
-<meta name="app-version" content="20260523-0955">
+<meta name="app-version" content="20260523-0956">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
 /* QR Code generator — inline, no CDN, global scope */
@@ -1638,9 +1638,6 @@ function closePrintDialog(){
 
 // ── Build ESC/POS byte array for 2.5 inch (58mm) paper ──
 function buildEscPos(data){
-  // PLAIN TEXT ONLY — no bold, no alignment commands, no special fonts
-  // Just text + newline, then cut at end
-
   const entryId  = String(data.entry_id  || '');
   const memberId = String(data.member_id || data.memberid    || '');
   const name     = String(data.name      || data.member_name || '');
@@ -1656,58 +1653,46 @@ function buildEscPos(data){
     ? new Date(data.timestamp).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
     : new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
 
-  // Build plain text receipt
-  const lines = [];
-  lines.push('SZVS JAIN SAMAJ');
-  lines.push('Member Entry Receipt');
-  lines.push('--------------------------------');
-  lines.push('Entry ID  : ' + entryId);
-  lines.push('Member ID : ' + memberId);
-  // Wrap name if too long
+  // Build one single plain text string — NO blank lines, NO special chars
+  // Printer gets one continuous stream
+  let txt = '';
+  txt += 'SZVS JAIN SAMAJ\n';
+  txt += 'Member Entry Receipt\n';
+  txt += '--------------------------------\n';
+  txt += 'Entry ID  : ' + entryId + '\n';
+  txt += 'Member ID : ' + memberId + '\n';
+  // Wrap long name
   if(name.length <= 22){
-    lines.push('Name      : ' + name);
+    txt += 'Name      : ' + name + '\n';
   } else {
-    lines.push('Name      : ' + name.substring(0,22));
-    lines.push('            ' + name.substring(22));
+    txt += 'Name      : ' + name.substring(0,22) + '\n';
+    txt += '            ' + name.substring(22)   + '\n';
   }
-  if(mobile) lines.push('Mobile    : ' + mobile);
-  lines.push('');
-  lines.push('Quantity  : ' + qty);
-  lines.push('Amt Paid  : Rs.' + amount);
-  if(marksheet === 'Yes') lines.push('Marksheet : Given');
-  if(remark.trim())       lines.push('Remark    : ' + remark.trim());
-  if(comment.trim())      lines.push('Comment   : ' + comment.trim());
-  lines.push('--------------------------------');
-  lines.push('Please issue above qty.');
-  lines.push('');
-  lines.push('Issued By : ' + username + ' (' + userid + ')');
-  lines.push('Date/Time : ' + dt);
-  lines.push('--------------------------------');
-  lines.push('');
-  lines.push('');
-  lines.push('');
-  lines.push('');
-  lines.push('    Sign / Stamp');
-  lines.push('--------------------------------');
-  lines.push('');
-  lines.push('');
-  lines.push('');
+  if(mobile) txt += 'Mobile    : ' + mobile + '\n';
+  txt += 'Quantity  : ' + qty + '\n';
+  txt += 'Amt Paid  : Rs.' + amount + '\n';
+  if(marksheet === 'Yes') txt += 'Marksheet : Given\n';
+  if(remark.trim())       txt += 'Remark    : ' + remark.trim() + '\n';
+  if(comment.trim())      txt += 'Comment   : ' + comment.trim() + '\n';
+  txt += '--------------------------------\n';
+  txt += 'Please issue above qty.\n';
+  txt += 'Issued By : ' + username + ' (' + userid + ')\n';
+  txt += 'Date/Time : ' + dt + '\n';
+  txt += '--------------------------------\n';
+  txt += '    Sign / Stamp\n';
+  txt += '--------------------------------\n';
+  txt += '\n\n\n\n\n';  // feed before cut
 
-  // Encode to bytes — plain ASCII/UTF-8 text + LF per line
-  const enc  = new TextEncoder();
-  const buf  = [];
+  // Encode entire text as bytes in one shot
+  const enc   = new TextEncoder();
+  const tBytes= Array.from(enc.encode(txt));
 
-  // ESC @ = initialize printer (reset all settings)
-  buf.push(0x1B, 0x40);
-
-  // Write each line as text + LF (0x0A)
-  for(const line of lines){
-    const bytes = Array.from(enc.encode(line));
-    buf.push(...bytes, 0x0A);
-  }
-
-  // GS V 65 16 = partial cut
-  buf.push(0x1D, 0x56, 0x41, 0x10);
+  // Final byte array: ESC@ + text + cut
+  const buf = [
+    0x1B, 0x40,          // ESC @ — initialize
+    ...tBytes,            // all text at once
+    0x1D, 0x56, 0x41, 0x10  // GS V A 16 — partial cut
+  ];
 
   return new Uint8Array(buf);
 }
@@ -1780,17 +1765,22 @@ async function doPrint(){
     statusEl.textContent = 'Printing…';
     const printData = buildEscPos(pendingPrintData);
 
-    // Send in 512-byte chunks (BLE MTU limit)
-    const CHUNK = 512;
+    // Send in small chunks with generous delay for thermal printer reliability
+    // 20 bytes = safe minimum BLE payload, 200ms delay gives printer time to process
+    const CHUNK = 20;
     for(let i=0; i<printData.length; i+=CHUNK){
       const chunk = printData.slice(i, i+CHUNK);
-      if(btCharacteristic.properties.writeWithoutResponse){
-        await btCharacteristic.writeValueWithoutResponse(chunk);
-      } else {
-        await btCharacteristic.writeValue(chunk);
+      try{
+        if(btCharacteristic.properties.writeWithoutResponse){
+          await btCharacteristic.writeValueWithoutResponse(chunk);
+        } else {
+          await btCharacteristic.writeValue(chunk);
+        }
+      }catch(writeErr){
+        console.warn('Chunk write error at byte',i,writeErr);
       }
-      // Small delay between chunks
-      await new Promise(r=>setTimeout(r,50));
+      // Wait for printer to process each chunk
+      await new Promise(r=>setTimeout(r,100));
     }
 
     statusEl.textContent = '✅ Printed successfully!';
